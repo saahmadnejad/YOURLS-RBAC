@@ -1,0 +1,51 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: yourls-rbac-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: yourls
+      MYSQL_USER: yourls
+      MYSQL_PASSWORD: yourls
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mariadb-admin', 'ping', '-h', 'localhost', '-u', 'yourls', '--password=yourls']
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: yourls-rbac-app
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    environment:
+      # Database
+      YOURLS_DB_HOST: db:3306
+      YOURLS_DB_USER: yourls
+      YOURLS_DB_PASS: yourls
+      YOURLS_DB_NAME: yourls
+      YOURLS_DB_PREFIX: yourls_
+
+      # Site
+      YOURLS_SITE: http://localhost:8080
+
+      # Admin credentials (default YOURLS login)
+      YOURLS_USER: admin
+      YOURLS_PASSWD: password123
+    volumes:
+      # Mount plugin source for live code iteration
+      - ./plugin.php:/var/www/html/user/plugins/rbac/plugin.php:ro
+      - ./includes:/var/www/html/user/plugins/rbac/includes:ro
+      - ./admin:/var/www/html/user/plugins/rbac/admin:ro
+      - ./uninstall.php:/var/www/html/user/plugins/rbac/uninstall.php:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
