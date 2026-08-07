@@ -1,0 +1,24 @@
+{
+    "name": "rbac/yourls-rbac",
+    "description": "RBAC plugin for YOURLS",
+    "type": "library",
+    "authors": [
+        {
+            "name": "ali",
+            "email": "sa.ahmadnejad@gmail.com"
+        }
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^13.3"
+    },
+    "autoload": {
+        "classmap": [
+            "includes/"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\Unit\\": "tests/Unit"
+        }
+    }
+}
