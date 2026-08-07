@@ -292,6 +292,19 @@ class Rbac {
         if ($user_role) {
             self::sync_role_permissions($user_role->id, $user_perms);
         }
+
+        // Create default admin user from YOURLS_USER/YOURLS_PASSWD globals
+        if (\defined('YOURLS_USER') && \YOURLS_USER !== '') {
+            $admin_user = self::get_user_by_username(\YOURLS_USER);
+            if (!$admin_user) {
+                $admin_pass = \defined('YOURLS_PASSWD') ? \YOURLS_PASSWD : 'password123';
+                self::create_user(\YOURLS_USER, $admin_pass, '', true);
+                $new_user = self::get_user_by_username(\YOURLS_USER);
+                if ($new_user && $admin_role) {
+                    self::assign_role_to_user($new_user->id, $admin_role->id);
+                }
+            }
+        }
     }
 
     private static function sync_role_permissions(int $role_id, array $permission_slugs): void {
@@ -378,7 +391,6 @@ class Rbac {
         }
 
         $hash = 'phpass:' . \yourls_phpass_hash($password);
-        $hash = str_replace('$', '!', $hash);
 
         $table = self::table_users();
         $active_int = $active ? 1 : 0;
@@ -428,7 +440,6 @@ class Rbac {
         if (isset($data['password'])) {
             $password = self::validate_password($data['password']);
             $hash = 'phpass:' . \yourls_phpass_hash($password);
-            $hash = str_replace('$', '!', $hash);
             $fields[] = '`password` = :password';
             $binds['password'] = $hash;
         }
