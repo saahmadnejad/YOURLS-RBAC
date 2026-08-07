@@ -127,11 +127,11 @@ vendor/bin/phpunit --testdox
 ```
 
 Tests follow the Arrange-Act-Assert (AAA) pattern. Each test method name
-documents the condition under test and the expected outcome:
+documents the method under test, the condition, and the expected outcome:
 
-| Naming pattern | Example |
+| Pattern | Example |
 |---|---|
-| `testMethod_whenCondition_thenResult` | `testValidateUsername_withSqlInjectionAttempt_throwsException` |
+| `testMethodName_WithCondition_ExpectedResult` | `testValidateUsername_WithSqlInjectionAttempt_ThrowsInvalidArgumentException` |
 
 ## Contributing
 
@@ -147,6 +147,29 @@ format: `type: description`.
 | `chore` | Build tooling, dependencies, CI |
 | `refactor` | Code restructuring without behavior change |
 | `style` | Formatting, whitespace, cosmetic changes |
+
+## Development
+
+### Docker (quick start)
+
+```bash
+docker compose up --build
+# Visit http://localhost:8080
+# Login: admin / password123
+```
+
+The Docker environment runs YOURLS (latest from GitHub), a MariaDB container,
+and mounts the RBAC plugin source as read-only volumes so code changes are
+reflected immediately without rebuilding.
+
+### Local testing (without Docker)
+
+You can also run the unit tests without a full YOURLS installation:
+
+```bash
+composer install
+vendor/bin/phpunit --testdox
+```
 
 ## References
 
