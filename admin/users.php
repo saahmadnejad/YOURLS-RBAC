@@ -26,12 +26,12 @@ if ($action === 'edit' && isset($_GET['id'])) {
 if (isset($_POST['save_user'])) {
     yourls_verify_nonce('rbac_save_user');
 
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $email = trim($_POST['email'] ?? '');
-    $active = (int) ($_POST['active'] ?? 1);
-    $id = (int) ($_POST['user_id'] ?? 0);
-    $role_ids = array_map('intval', $_POST['role_ids'] ?? []);
+    $username = trim($_POST['rbac_username'] ?? '');
+    $password = $_POST['rbac_password'] ?? '';
+    $email = trim($_POST['rbac_email'] ?? '');
+    $active = (int) ($_POST['rbac_active'] ?? 1);
+    $id = (int) ($_POST['rbac_user_id'] ?? 0);
+    $role_ids = array_map('intval', $_POST['rbac_role_ids'] ?? []);
 
     if ($id > 0) {
         $update_data = [
@@ -119,12 +119,12 @@ $all_roles = Rbac::get_all_roles();
         <tbody>
             <tr>
                 <th><?php yourls_e('Username'); ?></th>
-                <td><input type="text" name="username" class="text" size="40" value="<?php echo yourls_esc_attr($user_username); ?>" required /></td>
+                <td><input type="text" name="rbac_username" class="text" size="40" value="<?php echo yourls_esc_attr($user_username); ?>" required /></td>
             </tr>
             <tr>
                 <th><?php yourls_e('Password'); ?></th>
                 <td>
-                    <input type="password" name="password" class="text" size="40" autocomplete="new-password" />
+                    <input type="password" name="rbac_password" class="text" size="40" autocomplete="new-password" />
                     <?php if ($action === 'edit'): ?>
                         <br/><small><?php yourls_e('Leave blank to keep current password.'); ?></small>
                     <?php endif; ?>
@@ -132,13 +132,13 @@ $all_roles = Rbac::get_all_roles();
             </tr>
             <tr>
                 <th><?php yourls_e('Email'); ?></th>
-                <td><input type="email" name="email" class="text" size="60" value="<?php echo yourls_esc_attr($user_email); ?>" /></td>
+                <td><input type="email" name="rbac_email" class="text" size="60" value="<?php echo yourls_esc_attr($user_email); ?>" /></td>
             </tr>
             <tr>
                 <th><?php yourls_e('Active'); ?></th>
                 <td>
-                    <label><input type="radio" name="active" value="1" <?php echo $user_active == 1 ? 'checked="checked"' : ''; ?> /> <?php yourls_e('Yes'); ?></label>
-                    <label><input type="radio" name="active" value="0" <?php echo $user_active == 0 ? 'checked="checked"' : ''; ?> /> <?php yourls_e('No'); ?></label>
+                    <label><input type="radio" name="rbac_active" value="1" <?php echo $user_active == 1 ? 'checked="checked"' : ''; ?> /> <?php yourls_e('Yes'); ?></label>
+                    <label><input type="radio" name="rbac_active" value="0" <?php echo $user_active == 0 ? 'checked="checked"' : ''; ?> /> <?php yourls_e('No'); ?></label>
                 </td>
             </tr>
             <tr>
@@ -158,7 +158,7 @@ $all_roles = Rbac::get_all_roles();
                         ?>
                         <?php foreach ($all_roles as $r): ?>
                             <label style="display:inline-block;margin-right:10px;">
-                                <input type="checkbox" name="role_ids[]" value="<?php echo $r->id; ?>" <?php echo in_array($r->id, $assigned_role_ids) ? 'checked="checked"' : ''; ?> />
+                                <input type="checkbox" name="rbac_role_ids[]" value="<?php echo $r->id; ?>" <?php echo in_array($r->id, $assigned_role_ids) ? 'checked="checked"' : ''; ?> />
                                 <?php echo yourls_esc_html($r->name); ?> <small>(<?php echo yourls_esc_html($r->slug); ?>)</small>
                             </label>
                         <?php endforeach; ?>
@@ -168,7 +168,7 @@ $all_roles = Rbac::get_all_roles();
             <tr>
                 <th>&nbsp;</th>
                 <td>
-                    <input type="hidden" name="user_id" value="<?php echo $user_id; ?>" />
+                    <input type="hidden" name="rbac_user_id" value="<?php echo $user_id; ?>" />
                     <input type="submit" name="save_user" value="<?php yourls_e('Save User'); ?>" class="button primary" />
                     <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_users'); ?>'" />
                 </td>
