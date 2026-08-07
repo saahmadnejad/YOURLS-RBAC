@@ -1,4 +1,17 @@
 
-# idea files
+# IDE files
 .idea
 *.ipr
+.vscode
+
+# Composer dependencies
+vendor/
+composer.lock
+
+# PHPUnit
+.phpunit.cache
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
