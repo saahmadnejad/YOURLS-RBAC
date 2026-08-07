@@ -37,6 +37,9 @@ services:
       # Admin credentials (default YOURLS login)
       YOURLS_USER: admin
       YOURLS_PASSWD: password123
+
+      # Cookie key — set a fixed value to persist sessions across container restarts
+      # YOURLS_COOKIE_KEY: "your-long-random-string-here"
     volumes:
       # Mount plugin source for live code iteration
       - ./plugin.php:/var/www/html/user/plugins/rbac/plugin.php:ro

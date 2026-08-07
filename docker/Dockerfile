@@ -22,13 +22,17 @@ RUN docker-php-ext-install \
     ctype \
     dom
 
-# Enable Apache mod_rewrite and allow .htaccess overrides
-RUN a2enmod rewrite \
-    && echo "ServerName localhost" > /etc/apache2/conf-available/servername.conf \
+# Enable Apache modules
+RUN a2enmod rewrite headers
+
+# Configure Apache: ServerName + directory overrides
+RUN echo "ServerName localhost" > /etc/apache2/conf-available/servername.conf \
     && a2enconf servername \
-    && sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf \
-    && sed -i 's/AllowOverride None/AllowOverride All/' /etc/apache2/sites-available/000-default.conf \
-    && sed -i 's/Options Indexes FollowSymLinks/Options Indexes FollowSymLinks/' /etc/apache2/sites-available/000-default.conf
+    && rm -f /etc/apache2/sites-available/000-default.conf
+
+# YOURLS Apache vhost (handles URL routing directly, no .htaccess dependency)
+COPY docker/yourls-vhost.conf /etc/apache2/sites-available/000-default.conf
+RUN a2ensite 000-default
 
 # Clone YOURLS
 WORKDIR /var/www/html
@@ -42,7 +46,7 @@ RUN git clone --depth 1 https://github.com/YOURLS/YOURLS.git /tmp/yourls \
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && composer update --no-dev --optimize-autoloader --ignore-platform-req=php
 
-# Create RBAC plugin directory (plugin files mounted as volume in compose)
+# Create RBAC plugin directory (plugin files mounted as volumes in compose)
 RUN mkdir -p /var/www/html/user/plugins/rbac
 
 # Copy entrypoint script
