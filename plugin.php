@@ -129,6 +129,9 @@ yourls_add_action('admin_menu', 'yourls_rbac_admin_menu');
  * Load tablesorter CSS/JS for RBAC admin pages.
  */
 function yourls_rbac_html_head($context) {
+    if (!is_string($context)) {
+        return;
+    }
     if (strpos($context, 'plugin_page_rbac_') === 0) {
         echo '<link rel="stylesheet" href="' . yourls_site_url() . '/css/tablesorter.css?v=' . YOURLS_VERSION . '" type="text/css" media="screen" />';
         echo '<script src="' . yourls_site_url() . '/js/jquery-3.tablesorter.min.js?v=' . YOURLS_VERSION . '"></script>';
