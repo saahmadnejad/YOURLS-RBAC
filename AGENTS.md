@@ -49,3 +49,34 @@ database-backed users, roles, and permissions.
 | `php -l <file>` | Lint a PHP file |
 | `vendor/bin/phpunit` | Run the test suite |
 | `composer install` | Install dev dependencies (PHPUnit) |
+
+## Commit conventions
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>: a short description
+
+[optional body]
+```
+
+Commit types used in this project:
+
+| Type | When to use |
+|---|---|
+| `feat` | New feature or functionality |
+| `fix` | Bug fix or security hardening |
+| `test` | Adding or updating tests |
+| `docs` | Documentation changes (README, AGENTS.md, etc.) |
+| `chore` | Build tooling, dependencies, CI, gitignore |
+| `refactor` | Code restructuring without behavior change |
+| `style` | Formatting, whitespace, cosmetic changes |
+
+Examples:
+```
+feat: implement RBAC plugin core (entry point, database class, uninstall)
+fix: whitelist admin action params and handle validation errors
+test: add 80 unit tests for input validation methods
+docs: add project documentation and testing guide
+chore: update .gitignore for development artifacts
+```

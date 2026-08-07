@@ -133,6 +133,21 @@ documents the condition under test and the expected outcome:
 |---|---|
 | `testMethod_whenCondition_thenResult` | `testValidateUsername_withSqlInjectionAttempt_throwsException` |
 
+## Contributing
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
+format: `type: description`.
+
+| Type | When to use |
+|---|---|
+| `feat` | New feature or functionality |
+| `fix` | Bug fix or security hardening |
+| `test` | Adding or updating tests |
+| `docs` | Documentation changes |
+| `chore` | Build tooling, dependencies, CI |
+| `refactor` | Code restructuring without behavior change |
+| `style` | Formatting, whitespace, cosmetic changes |
+
 ## References
 
 <a id="r-1">[1]</a>
