@@ -11,10 +11,4 @@
             <directory>tests/Unit</directory>
         </testsuite>
     </testsuites>
-
-    <coverage>
-        <report>
-            <html outputDirectory="build/coverage"/>
-        </report>
-    </coverage>
 </phpunit>

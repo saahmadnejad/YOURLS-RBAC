@@ -15,7 +15,10 @@ Based on the RBAC model[[1]](#r-1).
 - **Roles** — group users into logical roles (Administrator, Manager, Editor, User).
 - **Permissions** — granular capability checks (`manage_urls`, `view_stats`,
   `manage_users`, `manage_roles`, `manage_permissions`, `manage_plugins`,
-  `access_admin`).
+  `manage_tools`, `access_admin`).
+- **Enforced everywhere** — permission checks gate core admin pages, AJAX
+  actions, the API, and plugin (de)activation, not just this plugin's own
+  pages (see [Permission enforcement](#permission-enforcement)).
 - **Admin UI** — built-in admin pages for managing users, roles, and permissions
   from the YOURLS admin area.
 - **Backward compatible** — existing `config.php` users still work alongside
@@ -32,10 +35,15 @@ Based on the RBAC model[[1]](#r-1).
    - `yourls_rbac_user_roles`
    - `yourls_rbac_role_permissions`
 4. Default roles and permissions are seeded on activation:
-   - **Administrator** — full access (all permissions)
-   - **Manager** — `access_admin`, `manage_urls`, `view_stats`
+   - **Administrator** — full access (all permissions, including `manage_tools`)
+   - **Manager** — `access_admin`, `manage_urls`, `view_stats`, `manage_tools`
    - **Editor** — `access_admin`, `manage_urls`, `view_stats`
    - **User** — `access_admin`
+
+   A first admin user is created from `YOURLS_USER` / `YOURLS_PASSWD` **only
+   if** `YOURLS_PASSWD` is set to a strong password (8+ characters). If it is
+   empty, no user is seeded — set the config credentials or create the first
+   admin manually, then log in via **Admin → User Management**.
 5. Create users from **Admin → Plugins → your plugin admin pages → Users**.
 
 ## Usage
@@ -81,6 +89,40 @@ yourls_rbac_require('manage_users');
 This means login, logout, cookie expiry, and "remember me" all behave exactly
 as in stock YOURLS.
 
+> RBAC enforcement only applies to authenticated requests, so your install
+> must be private (`YOURLS_PRIVATE` defaults to `true`). On a public install
+> there is nothing to enforce — anyone can hit the admin area anonymously.
+
+## Permission enforcement
+
+Permissions are enforced at the YOURLS seams — no core files are modified:
+
+| Surface | Hook | Enforced permission |
+|---|---|---|
+| Core admin pages (`index.php`, `tools.php`, `plugins.php`, `upgrade.php`) | `auth_successful` + page map | `access_admin` / `manage_tools` / `manage_plugins` |
+| Plugin (de)activation (`plugins.php?action=activate\|deactivate`) | `auth_successful` | `manage_plugins` |
+| AJAX URL mutations (`add`, `edit_display`, `edit_save`, `delete`) | `auth_successful` + AJAX map | `manage_urls` |
+| API writes (`shorturl`) | `auth_successful` + API map | `manage_urls` |
+| API reads (`stats`, `db-stats`, `url-stats`, `expand`) | `auth_successful` + API map | `view_stats` |
+| All URL writes, any entry point | `shunt_add_new_link`, `shunt_edit_link`, `shunt_edit_link_title`, `shunt_delete_link_by_keyword` | `manage_urls` |
+| RBAC's own admin pages | page callbacks | `manage_users` / `manage_roles` / `manage_permissions` |
+
+Denials are fail-closed: API gets a JSON 403, AJAX a JSON 403, HTML pages a
+`yourls_die()` 403. A user not found in the RBAC tables has no permissions —
+add them (with a role) from the Users page before they can do anything.
+
+Additional lockout guards (all enforced server-side):
+
+- The last active administrator cannot be deleted or demoted.
+- You cannot deactivate or delete your own account.
+- The `admin` role slug cannot be renamed or deleted; its permission set is
+  always every permission.
+- Core permission slugs (`access_admin`, `manage_users`, `manage_roles`,
+  `manage_permissions`) cannot be deleted or renamed.
+- You cannot remove `manage_roles` from a role assigned to yourself.
+- Destructive actions (delete user/role/permission) are POST-only with
+  nonces — no state changes via GET links.
+
 ## Database schema
 
 ```
@@ -102,51 +144,77 @@ yourls_rbac_role_permissions  (many-to-many: roles ↔ permissions)
 
 ## Uninstall
 
-When the plugin is deactivated, `uninstall.php` drops all five tables.
-To preserve data on deactivation, add to your `config.php`:
+When the plugin is deactivated, RBAC data is **kept by default** —
+re-activating the plugin restores users, roles, and permissions seamlessly.
+
+To drop all five tables on deactivation instead, add to your `config.php`:
 
 ```php
-define('YOURLS_RBAC_KEEP_DATA', true);
+define('YOURLS_RBAC_DROP_DATA', true);
 ```
 
-## Testing
-
-Unit tests use [PHPUnit](https://phpunit.de/) and cover the input validation
-methods in `includes/rbac.php`.
-
-### Setup
-
-```bash
-composer install
-```
-
-### Run tests
-
-```bash
-vendor/bin/phpunit --testdox
-```
-
-Tests follow the Arrange-Act-Assert (AAA) pattern. Each test method name
-documents the method under test, the condition, and the expected outcome:
-
-| Pattern | Example |
-|---|---|
-| `testMethodName_WithCondition_ExpectedResult` | `testValidateUsername_WithSqlInjectionAttempt_ThrowsInvalidArgumentException` |
+> **Warning**: dropping the tables deletes every RBAC user. Make sure the
+> `config.php` account (`YOURLS_USER` / `YOURLS_PASSWD`) still works before
+> enabling this, or you will be locked out.
 
 ## Contributing
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
-format: `type: description`.
+### Commit messages
+
+Commits follow the [Conventional Commits](https://www.conventionalcommits.org/)
+standard:
+
+```
+<type>[optional scope]: <short description in lowercase, imperative mood>
+
+[optional body: motivation and what changed, wrapped at 72 chars]
+
+[optional footer: BREAKING CHANGE: <...>, Refs: #<issue>]
+```
+
+Types used in this project:
 
 | Type | When to use |
 |---|---|
 | `feat` | New feature or functionality |
 | `fix` | Bug fix or security hardening |
 | `test` | Adding or updating tests |
-| `docs` | Documentation changes |
-| `chore` | Build tooling, dependencies, CI |
+| `docs` | Documentation changes (README, AGENTS.md, etc.) |
+| `chore` | Build tooling, dependencies, CI, gitignore |
 | `refactor` | Code restructuring without behavior change |
 | `style` | Formatting, whitespace, cosmetic changes |
+
+A commit that introduces a breaking change (e.g. a permission slug is
+renamed) must note it in the footer: `BREAKING CHANGE: manage_tools renamed to ...`.
+
+### Testing conventions
+
+- Tests use PHPUnit, run with `vendor/bin/phpunit --testdox`.
+- Every test follows the **Arrange / Act / Assert** (AAA) principle — one
+  behavior per test, no test logic in the Act phase, exactly one logical
+  assertion group.
+- Use **Given / When / Then** comments to make each phase explicit:
+
+```php
+public function testValidatePassword_WithLength7_ThrowsInvalidArgumentException(): void
+{
+    // Given: a password one character below the minimum length
+    // When: validated
+    // Then: an InvalidArgumentException with a helpful message is thrown
+    $this->expectException(InvalidArgumentException::class);
+    $this->expectExceptionMessage('Password must be at least 8 characters');
+    Rbac::validate_password('abcdefg');
+}
+```
+
+- Test method naming convention: `testMethodName_WithCondition_ExpectedResult`
+  (e.g. `testValidateUsername_WithSqlInjectionAttempt_ThrowsInvalidArgumentException`).
+- Tests for the pure logic in `includes/rbac.php` (validation, permission
+  maps, denial payloads) live in `tests/Unit/`. The test bootstrap
+  (`tests/bootstrap.php`) provides YOURLS stubs so tests run without a full
+  YOURLS installation.
+- Security-relevant behavior (injection attempts, permission maps, lockout
+  guards) always gets a test — a fix without a regression test is incomplete.
 
 ## Development
 
@@ -155,7 +223,8 @@ format: `type: description`.
 ```bash
 docker compose up --build
 # Visit http://localhost:8080
-# Login: admin / password123
+# Login: admin / password123 (dev convenience only — RBAC accepts it
+# because it is 11 chars; production installs must use strong passwords)
 ```
 
 The Docker environment runs YOURLS (latest from GitHub), a MariaDB container,
