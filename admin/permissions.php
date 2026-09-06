@@ -32,6 +32,13 @@ if (isset($_POST['save_permission'])) {
     $id = (int) ($_POST['perm_id'] ?? 0);
 
     if ($id > 0) {
+        // Core permission slugs cannot be renamed — they gate the admin UI.
+        $existing = Rbac::get_permission_by_id($id);
+        if ($existing && in_array($existing->slug, ['access_admin', 'manage_users', 'manage_roles', 'manage_permissions'], true) && $slug !== $existing->slug) {
+            yourls_add_notice(yourls__('The slug of a core permission cannot be changed.'));
+            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
+            exit();
+        }
         try {
             $result = Rbac::update_permission($id, $name, $slug, $desc);
             $msg = $result ? yourls__('Permission updated.') : yourls__('Failed to update permission.');
@@ -55,12 +62,19 @@ if (isset($_POST['save_permission'])) {
     exit();
 }
 
-if ($action === 'delete' && isset($_GET['id'])) {
-    $perm_id = (int) $_GET['id'];
+if ($action === 'delete' && isset($_REQUEST['id'])) {
+    $perm_id = (int) $_REQUEST['id'];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        // Destructive actions must be POSTed, not fetched.
+        yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
+        exit();
+    }
+    yourls_verify_nonce('rbac_delete_permission');
     if ($perm_id > 0) {
-        yourls_verify_nonce('rbac_delete_permission');
         $perm = Rbac::get_permission_by_id($perm_id);
-        if ($perm) {
+        if ($perm && in_array($perm->slug, ['access_admin', 'manage_users', 'manage_roles', 'manage_permissions'], true)) {
+            yourls_add_notice(yourls__('Cannot delete a core permission. (It is required for the admin interface to stay usable.)'));
+        } elseif ($perm) {
             $result = Rbac::delete_permission($perm_id);
             $msg = $result ? yourls_s('Permission "%s" deleted.', $perm->name) : yourls__('Failed to delete permission.');
             yourls_add_notice($msg);
@@ -132,7 +146,12 @@ $permissions = Rbac::get_all_permissions();
             <td><?php echo yourls_esc_html($p->description ?? ''); ?></td>
             <td>
                 <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_permissions&action=edit&id=' . $p->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
-                <a href="<?php echo yourls_nonce_url('rbac_delete_permission', yourls_add_query_arg(['page' => 'rbac_permissions', 'action' => 'delete', 'id' => $p->id], yourls_admin_url('plugins.php'))); ?>" class="button" onclick="return confirm('<?php yourls_e('Are you sure?'); ?>');" style="background:#e74c3c;color:#fff;"><?php yourls_e('Delete'); ?></a>
+                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_permissions&action=delete&id=' . $p->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
+                    <?php yourls_nonce_field('rbac_delete_permission'); ?>
+                    <input type="hidden" name="id" value="<?php echo (int) $p->id; ?>" />
+                    <input type="hidden" name="action" value="delete" />
+                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
+                </form>
             </td>
         </tr>
         <?php endforeach; ?>

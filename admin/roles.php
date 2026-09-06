@@ -29,7 +29,18 @@ if (isset($_POST['save_role'])) {
     $slug = trim($_POST['role_slug'] ?? '');
     $desc = trim($_POST['role_desc'] ?? '');
     $id = (int) ($_POST['role_id'] ?? 0);
-    $permission_slugs = $_POST['permission_slugs'] ?? [];
+    $permission_slugs = is_array($_POST['permission_slugs'] ?? null) ? $_POST['permission_slugs'] : [];
+
+    // Protected slugs cannot be renamed or repointed — guards core seeds.
+    $protected_slugs = ['admin'];
+    if ($id > 0) {
+        $existing = Rbac::get_role_by_id($id);
+        if ($existing && in_array($existing->slug, $protected_slugs, true) && $slug !== $existing->slug) {
+            yourls_add_notice(yourls__('The Administrator role slug cannot be changed.'));
+            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
+            exit();
+        }
+    }
 
     if ($id > 0) {
         try {
@@ -51,6 +62,31 @@ if (isset($_POST['save_role'])) {
     }
 
     if ($id > 0) {
+        // A role you hold cannot be stripped of the very permissions that
+        // let you manage roles — no self-privilege-revocation lockouts, and
+        // the admin role always keeps every permission.
+        $my_role = false;
+        if (defined('YOURLS_USER')) {
+            $me = Rbac::get_user_by_username(YOURLS_USER);
+            if ($me) {
+                foreach (Rbac::get_user_roles($me->id) as $r) {
+                    if ((int) $r->id === $id) {
+                        $my_role = true;
+                        break;
+                    }
+                }
+            }
+        }
+        $edited = Rbac::get_role_by_id($id);
+        if ($edited && $edited->slug === 'admin') {
+            // Administrator role always keeps all permissions.
+            $permission_slugs = array_map(fn($p) => $p->slug, Rbac::get_all_permissions());
+        } elseif ($my_role && !in_array('manage_roles', $permission_slugs, true)) {
+            yourls_add_notice(yourls__('You cannot remove "manage_roles" from a role assigned to you.'));
+            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
+            exit();
+        }
+
         $perms = Rbac::get_all_permissions();
         foreach ($perms as $p) {
             if (in_array($p->slug, $permission_slugs)) {
@@ -70,16 +106,38 @@ if (isset($_POST['save_role'])) {
     exit();
 }
 
-if ($action === 'delete' && isset($_GET['id'])) {
-    $role_id = (int) $_GET['id'];
+if ($action === 'delete' && isset($_REQUEST['id'])) {
+    $role_id = (int) $_REQUEST['id'];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        // Destructive actions must be POSTed, not fetched.
+        yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
+        exit();
+    }
+    yourls_verify_nonce('rbac_delete_role');
     if ($role_id > 0) {
-        yourls_verify_nonce('rbac_delete_role');
         $role = Rbac::get_role_by_id($role_id);
-        if ($role && $role->slug !== 'admin') {
-            $result = Rbac::delete_role($role_id);
-            yourls_add_notice($result ? yourls__('Role deleted.') : yourls__('Failed to delete role.'));
-        } elseif ($role && $role->slug === 'admin') {
+        if ($role && $role->slug === 'admin') {
             yourls_add_notice(yourls__('Cannot delete the Administrator role.'));
+        } elseif ($role) {
+            // Deleting a role you hold would demote you mid-session.
+            $is_self = false;
+            if (defined('YOURLS_USER')) {
+                $me = Rbac::get_user_by_username(YOURLS_USER);
+                if ($me) {
+                    foreach (Rbac::get_user_roles($me->id) as $r) {
+                        if ((int) $r->id === $role_id) {
+                            $is_self = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($is_self) {
+                yourls_add_notice(yourls__('You cannot delete a role assigned to you.'));
+            } else {
+                $result = Rbac::delete_role($role_id);
+                yourls_add_notice($result ? yourls__('Role deleted.') : yourls__('Failed to delete role.'));
+            }
         }
     }
     yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
@@ -181,7 +239,12 @@ if ($role_id > 0) {
             <td>
                 <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_roles&action=edit&id=' . $r->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
                 <?php if ($r->slug !== 'admin'): ?>
-                <a href="<?php echo yourls_nonce_url('rbac_delete_role', yourls_add_query_arg(['page' => 'rbac_roles', 'action' => 'delete', 'id' => $r->id], yourls_admin_url('plugins.php'))); ?>" class="button" onclick="return confirm('<?php yourls_e('Are you sure?'); ?>');" style="background:#e74c3c;color:#fff;"><?php yourls_e('Delete'); ?></a>
+                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_roles&action=delete&id=' . $r->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
+                    <?php yourls_nonce_field('rbac_delete_role'); ?>
+                    <input type="hidden" name="id" value="<?php echo (int) $r->id; ?>" />
+                    <input type="hidden" name="action" value="delete" />
+                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
+                </form>
                 <?php endif; ?>
             </td>
         </tr>

@@ -32,13 +32,45 @@ if (isset($_POST['save_user'])) {
     $active = (int) ($_POST['rbac_active'] ?? 1);
     $id = (int) ($_POST['rbac_user_id'] ?? 0);
     $role_ids = array_map('intval', $_POST['rbac_role_ids'] ?? []);
+    $role_ids = array_values(array_unique(array_filter($role_ids, fn($r) => $r > 0)));
 
     if ($id > 0) {
+        // Editing your own account? Deactivating or demoting yourself (or the
+        // last active admin) is refused to prevent lockouts.
+        $target = Rbac::get_user_by_id($id);
+        $is_self = $target && defined('YOURLS_USER') && $target->username === YOURLS_USER;
+        if ($is_self && $active === 0) {
+            yourls_add_notice(yourls__('You cannot deactivate your own account.'));
+            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
+            exit();
+        }
+
+        $current_roles = Rbac::get_user_roles($id);
+        $current_role_ids = array_map(fn($r) => $r->id, $current_roles);
+        $current_slugs = array_map(fn($r) => $r->slug, $current_roles);
+        $new_slugs = [];
+        foreach ($role_ids as $rid) {
+            $role = Rbac::get_role_by_id($rid);
+            if ($role) {
+                $new_slugs[] = $role->slug;
+            }
+        }
+
+        $loses_admin = in_array('admin', $current_slugs, true) && !in_array('admin', $new_slugs, true);
+        if ($loses_admin && Rbac::count_active_users_with_role('admin') <= 1) {
+            yourls_add_notice(yourls__('Cannot remove the administrator role from the last active administrator.'));
+            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
+            exit();
+        }
+
         $update_data = [
             'username' => $username,
             'email'    => $email,
             'active'   => $active,
         ];
+        if ($is_self && $active === 0) {
+            unset($update_data['active']);
+        }
         if (!empty($password)) {
             $update_data['password'] = $password;
         }
@@ -51,9 +83,6 @@ if (isset($_POST['save_user'])) {
         }
 
         // Sync roles
-        $current_roles = Rbac::get_user_roles($id);
-        $current_role_ids = array_map(fn($r) => $r->id, $current_roles);
-
         foreach ($role_ids as $rid) {
             if (!in_array($rid, $current_role_ids)) {
                 Rbac::assign_role_to_user($id, $rid);
@@ -87,18 +116,30 @@ if (isset($_POST['save_user'])) {
     exit();
 }
 
-if ($action === 'delete' && isset($_GET['id'])) {
-    $user_id = (int) $_GET['id'];
-    if ($user_id > 0 && $user_id !== 1) {
-        yourls_verify_nonce('rbac_delete_user');
+if ($action === 'delete' && isset($_REQUEST['id'])) {
+    $user_id = (int) $_REQUEST['id'];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        // Destructive actions must be POSTed, not fetched.
+        yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
+        exit();
+    }
+    yourls_verify_nonce('rbac_delete_user');
 
-        $user = Rbac::get_user_by_id($user_id);
-        if ($user) {
-            $result = Rbac::delete_user($user_id);
-            yourls_add_notice($result ? yourls_s('User "%s" deleted.', $user->username) : yourls__('Failed to delete user.'));
-        }
-    } elseif ($user_id <= 0 || $user_id === 1) {
+    if ($user_id <= 0) {
         yourls_add_notice(yourls__('Cannot delete this user.'));
+    } else {
+        $user = Rbac::get_user_by_id($user_id);
+        $is_self = $user && defined('YOURLS_USER') && $user->username === YOURLS_USER;
+        if ($is_self) {
+            yourls_add_notice(yourls__('You cannot delete your own account.'));
+        } elseif ($user) {
+            try {
+                $result = Rbac::delete_user($user_id);
+                yourls_add_notice($result ? yourls_s('User "%s" deleted.', $user->username) : yourls__('Failed to delete user.'));
+            } catch (\RuntimeException $e) {
+                yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
+            }
+        }
     }
     yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
     exit();
@@ -210,7 +251,12 @@ $all_roles = Rbac::get_all_roles();
             </td>
             <td>
                 <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_users&action=edit&id=' . $u->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
-                <a href="<?php echo yourls_nonce_url('rbac_delete_user', yourls_add_query_arg(['page' => 'rbac_users', 'action' => 'delete', 'id' => $u->id], yourls_admin_url('plugins.php'))); ?>" class="button" onclick="return confirm('<?php yourls_e('Are you sure?'); ?>');" style="background:#e74c3c;color:#fff;"><?php yourls_e('Delete'); ?></a>
+                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_users&action=delete&id=' . $u->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
+                    <?php yourls_nonce_field('rbac_delete_user'); ?>
+                    <input type="hidden" name="id" value="<?php echo (int) $u->id; ?>" />
+                    <input type="hidden" name="action" value="delete" />
+                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
+                </form>
             </td>
         </tr>
         <?php endforeach; ?>
