@@ -27,16 +27,17 @@ define('YOURLS_COOKIEKEY', '$COOKIE_KEY');
 
 // Access control
 define('YOURLS_PRIVATE', getenv('YOURLS_PRIVATE') ?: 'true');
-define('YOURLS_USER', getenv('YOURLS_USER') ?: 'admin');
-define('YOURLS_PASSWD', getenv('YOURLS_PASSWD') ?: 'password123');
 
-// User passwords array (YOURLS uses this for authentication, not the constants above)
+// User passwords array (YOURLS uses this for authentication).
+// NOTE: the YOURLS_USER constant is deliberately NOT defined — with it
+// defined, yourls_set_user() would no-op and every DB user session would
+// resolve to the config account, breaking RBAC entirely.
 \$user = getenv('YOURLS_USER') ?: 'admin';
 \$pass = getenv('YOURLS_PASSWD') ?: 'password123';
 \$yourls_user_passwords = array(\$user => \$pass);
 
 // Debug
-define('YOURLS_DEBUG', false);
+define('YOURLS_DEBUG', getenv('YOURLS_DEBUG') ?: false);
 
 // Skip version check (fails without internet access)
 define('YOURLS_NO_VERSION_CHECK', true);
