@@ -53,21 +53,110 @@ function yourls_rbac_has_role(string $role): bool {
 }
 
 /**
- * Require a permission or die.
+ * Require a permission or die (fail closed in every context: admin, AJAX, API).
  * @param string $permission Permission slug
  * @return void
  */
 function yourls_rbac_require(string $permission): void {
     if (!yourls_rbac_can($permission)) {
-        if (yourls_is_admin()) {
-            yourls_die(
-                yourls__('You do not have permission to access this page.'),
-                yourls__('Forbidden'),
-                403
-            );
-        }
+        \YOURLS\RBAC\Rbac::deny_request();
     }
 }
+
+// --- Enforcement ---
+
+/**
+ * Map a request to the permission it requires. Returns '' when RBAC does not
+ * gate this request (asset, login, API version probe, RBAC's own pages...).
+ *
+ * @return string Permission slug or ''
+ */
+function yourls_rbac_required_permission(): string {
+    // API actions
+    if (\yourls_is_API() && isset($_REQUEST['action'])) {
+        return \YOURLS\RBAC\Rbac::required_permission_for_api((string) $_REQUEST['action']);
+    }
+
+    // AJAX actions
+    if (\yourls_is_Ajax() && isset($_REQUEST['action'])) {
+        return \YOURLS\RBAC\Rbac::required_permission_for_ajax((string) $_REQUEST['action']);
+    }
+
+    // Admin pages (basename of the script). RBAC's own plugin pages are gated
+    // individually by their page callbacks (see yourls_rbac_page_* below).
+    if (\yourls_is_admin()) {
+        $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        if ($script === 'plugins.php' && isset($_GET['page']) && str_starts_with((string) $_GET['page'], 'rbac_')) {
+            return '';
+        }
+        return \YOURLS\RBAC\Rbac::required_permission_for_page($script);
+    }
+
+    return '';
+}
+
+/**
+ * Enforce RBAC permissions on every authenticated request.
+ * Hooked into 'auth_successful' (fires after YOURLS_USER is set, in every
+ * private context: admin pages, admin-ajax.php and yourls-api.php).
+ *
+ * Note: plugin pages (plugins.php?page=rbac_*) are additionally gated by the
+ * individual page callbacks below — the map only needs the coarse page level.
+ *
+ * @return void
+ */
+function yourls_rbac_enforce() {
+    // Plugin (de)activation is a 'manage_plugins' action in disguise.
+    if (\yourls_is_admin() && basename($_SERVER['SCRIPT_NAME'] ?? '') === 'plugins.php'
+        && isset($_GET['action'], $_GET['plugin'])
+        && in_array($_GET['action'], ['activate', 'deactivate'], true)) {
+        yourls_rbac_require('manage_plugins');
+    }
+
+    $permission = yourls_rbac_required_permission();
+    if ($permission !== '' && !yourls_rbac_can($permission)) {
+        \YOURLS\RBAC\Rbac::deny_request();
+    }
+}
+yourls_add_action('auth_successful', 'yourls_rbac_enforce');
+
+/**
+ * Write guards: YOURLS core (admin form, AJAX and API alike) funnels every
+ * URL mutation through these functions, so shunting them enforces
+ * 'manage_urls' everywhere in one place each.
+ */
+
+function yourls_rbac_guard_add_new_link($pre, $url, $keyword = '', $title = '') {
+    if (!yourls_rbac_can('manage_urls')) {
+        return \YOURLS\RBAC\Rbac::url_write_denied();
+    }
+    return $pre;
+}
+yourls_add_filter('shunt_add_new_link', 'yourls_rbac_guard_add_new_link', 10, 4);
+
+function yourls_rbac_guard_edit_link($pre, $keyword, $url, $keyword2 = '', $newkeyword = '', $title = '') {
+    if (!yourls_rbac_can('manage_urls')) {
+        return \YOURLS\RBAC\Rbac::url_write_denied();
+    }
+    return $pre;
+}
+yourls_add_filter('shunt_edit_link', 'yourls_rbac_guard_edit_link', 10, 6);
+
+function yourls_rbac_guard_edit_link_title($pre, $keyword, $title) {
+    if (!yourls_rbac_can('manage_urls')) {
+        return \YOURLS\RBAC\Rbac::url_write_denied();
+    }
+    return $pre;
+}
+yourls_add_filter('shunt_edit_link_title', 'yourls_rbac_guard_edit_link_title', 10, 3);
+
+function yourls_rbac_guard_delete_link_by_keyword($pre, $keyword) {
+    if (!yourls_rbac_can('manage_urls')) {
+        return \YOURLS\RBAC\Rbac::url_write_denied();
+    }
+    return $pre;
+}
+yourls_add_filter('shunt_delete_link_by_keyword', 'yourls_rbac_guard_delete_link_by_keyword', 10, 2);
 
 // --- Hooks ---
 
@@ -96,16 +185,14 @@ function yourls_rbac_activate($plugin) {
 yourls_add_action('activated_plugin', 'yourls_rbac_activate');
 
 /**
- * On admin_init: ensure tables exist on every admin page load (lazy init).
+ * On admin_init: ensure tables exist and defaults are seeded (idempotent —
+ * also backfills new permissions/roles on upgrades of pre-existing installs).
  */
 function yourls_rbac_maybe_init() {
     if (!\YOURLS\RBAC\Rbac::tables_exist()) {
         \YOURLS\RBAC\Rbac::create_tables();
-        \YOURLS\RBAC\Rbac::seed_defaults();
-    } elseif (yourls_get_option('rbac_needs_seed', false)) {
-        \YOURLS\RBAC\Rbac::seed_defaults();
-        yourls_delete_option('rbac_needs_seed');
     }
+    \YOURLS\RBAC\Rbac::seed_defaults();
 }
 yourls_add_action('admin_init', 'yourls_rbac_maybe_init');
 
@@ -114,6 +201,11 @@ yourls_add_action('admin_init', 'yourls_rbac_maybe_init');
  */
 function yourls_rbac_admin_menu() {
     if (!defined('YOURLS_USER')) {
+        return;
+    }
+
+    // Only render the menu entry for users who can reach at least one RBAC page.
+    if (!yourls_rbac_can('manage_roles') && !yourls_rbac_can('manage_users') && !yourls_rbac_can('manage_permissions')) {
         return;
     }
 
@@ -147,6 +239,12 @@ function yourls_rbac_register_pages() {
     yourls_register_plugin_page('rbac_users',       'Users',       'yourls_rbac_page_users');
     yourls_register_plugin_page('rbac_roles',       'Roles',       'yourls_rbac_page_roles');
     yourls_register_plugin_page('rbac_permissions', 'Permissions', 'yourls_rbac_page_permissions');
+
+    // Gate the pages before YOURLS renders the admin HTML head, so a denial
+    // sends a real 403 status (yourls_die() after html_head cannot change it).
+    yourls_add_action('load-rbac_users',       fn() => yourls_rbac_require('manage_users'));
+    yourls_add_action('load-rbac_roles',       fn() => yourls_rbac_require('manage_roles'));
+    yourls_add_action('load-rbac_permissions', fn() => yourls_rbac_require('manage_permissions'));
 }
 yourls_add_action('plugins_loaded', 'yourls_rbac_register_pages');
 

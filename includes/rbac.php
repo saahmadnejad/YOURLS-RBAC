@@ -26,7 +26,15 @@ class Rbac {
         return defined('YOURLS_RBAC_TABLE_ROLE_PERMISSIONS') ? \YOURLS_RBAC_TABLE_ROLE_PERMISSIONS : \YOURLS_DB_PREFIX . 'rbac_role_permissions';
     }
 
-    public static function db($context = 'read-rbac'): YDB {
+    /**
+     * Get the YOURLS DB handle. Context must match YOURLS 1.10's naming
+     * schema: prefix "read-"/"write-" + lowercase words separated by
+     * underscores (hyphens are NOT allowed after the prefix).
+     */
+    public static function db(string $context = 'read-rbac_fallback'): YDB {
+        if (!preg_match('/^(read|write)-[a-z0-9_]+$/', $context)) {
+            $context = 'read-rbac_fallback';
+        }
         return \yourls_get_db($context);
     }
 
@@ -99,8 +107,8 @@ class Rbac {
         if ($password === '') {
             throw new \InvalidArgumentException('Password cannot be empty');
         }
-        if (strlen($password) < 4) {
-            throw new \InvalidArgumentException('Password must be at least 4 characters');
+        if (strlen($password) < 8) {
+            throw new \InvalidArgumentException('Password must be at least 8 characters');
         }
         if (strlen($password) > 255) {
             throw new \InvalidArgumentException('Password must be 255 characters or less');
@@ -137,14 +145,14 @@ class Rbac {
      * Check if a table exists in the database.
      */
     public static function tables_exist(): bool {
-        $db = self::db('read-rbac-tables_exist');
+        $db = self::db('read-rbac_tables_exist');
         $table = self::table_users();
         $result = $db->fetchValue("SHOW TABLES LIKE :table", ['table' => $table]);
         return (bool) $result;
     }
 
     public static function create_tables(): array {
-        $db = self::db('write-rbac-create_tables');
+        $db = self::db('write-rbac_create_tables');
         $results = ['success' => [], 'error' => []];
 
         $tables = [
@@ -189,7 +197,9 @@ class Rbac {
                     `role_id` int(10) unsigned NOT NULL,
                     PRIMARY KEY (`user_id`, `role_id`),
                     KEY `user_id` (`user_id`),
-                    KEY `role_id` (`role_id`)
+                    KEY `role_id` (`role_id`),
+                    CONSTRAINT `" . self::table_user_roles() . "_user_fk` FOREIGN KEY (`user_id`) REFERENCES `" . self::table_users() . "` (`id`) ON DELETE CASCADE,
+                    CONSTRAINT `" . self::table_user_roles() . "_role_fk` FOREIGN KEY (`role_id`) REFERENCES `" . self::table_roles() . "` (`id`) ON DELETE CASCADE
                 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
 
             self::table_role_permissions() =>
@@ -198,7 +208,9 @@ class Rbac {
                     `permission_id` int(10) unsigned NOT NULL,
                     PRIMARY KEY (`role_id`, `permission_id`),
                     KEY `role_id` (`role_id`),
-                    KEY `permission_id` (`permission_id`)
+                    KEY `permission_id` (`permission_id`),
+                    CONSTRAINT `" . self::table_role_permissions() . "_role_fk` FOREIGN KEY (`role_id`) REFERENCES `" . self::table_roles() . "` (`id`) ON DELETE CASCADE,
+                    CONSTRAINT `" . self::table_role_permissions() . "_perm_fk` FOREIGN KEY (`permission_id`) REFERENCES `" . self::table_permissions() . "` (`id`) ON DELETE CASCADE
                 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
         ];
 
@@ -216,7 +228,7 @@ class Rbac {
     }
 
     public static function drop_tables(): void {
-        $db = self::db('write-rbac-drop_tables');
+        $db = self::db('write-rbac_drop_tables');
         $tables = [
             self::table_users(),
             self::table_roles(),
@@ -238,6 +250,7 @@ class Rbac {
             ['name' => 'Manage Roles',        'slug' => 'manage_roles',        'description' => 'Can create, edit, and delete roles'],
             ['name' => 'Manage Permissions',  'slug' => 'manage_permissions',   'description' => 'Can manage role-permission assignments'],
             ['name' => 'Manage Plugins',      'slug' => 'manage_plugins',      'description' => 'Can activate and deactivate plugins'],
+            ['name' => 'Manage Tools',        'slug' => 'manage_tools',        'description' => 'Can access admin tools and maintenance functions'],
         ];
 
         $existing = self::get_all_permissions();
@@ -259,14 +272,20 @@ class Rbac {
         $existing_roles = self::get_all_roles();
         $existing_role_slugs = array_column($existing_roles, 'slug');
 
+        $created_role_slugs = [];
         foreach ($roles as $role) {
             if (!in_array($role['slug'], $existing_role_slugs)) {
-                self::create_role($role['name'], $role['slug'], $role['description']);
+                $result = self::create_role($role['name'], $role['slug'], $role['description']);
+                if ($result) {
+                    $created_role_slugs[] = $role['slug'];
+                }
             }
         }
 
         $admin_role = self::get_role_by_slug('admin');
         if ($admin_role) {
+            // The admin role always holds every permission (backfills new
+            // permissions added by plugin upgrades on existing installs).
             $all_perms = self::get_all_permissions();
             foreach ($all_perms as $perm) {
                 if (!self::role_has_permission($admin_role->id, $perm->id)) {
@@ -275,40 +294,61 @@ class Rbac {
             }
         }
 
-        $manager_perms = ['access_admin', 'manage_urls', 'view_stats'];
-        $manager_role = self::get_role_by_slug('manager');
-        if ($manager_role) {
-            self::sync_role_permissions($manager_role->id, $manager_perms);
+        // Default permission sets are only applied to roles created in THIS
+        // seed run — never resynced, so admins can freely edit seeded roles.
+        if (in_array('manager', $created_role_slugs, true)) {
+            $manager_role = self::get_role_by_slug('manager');
+            if ($manager_role) {
+                self::sync_role_permissions($manager_role->id, ['access_admin', 'manage_urls', 'view_stats', 'manage_tools']);
+            }
+        }
+        if (in_array('editor', $created_role_slugs, true)) {
+            $editor_role = self::get_role_by_slug('editor');
+            if ($editor_role) {
+                self::sync_role_permissions($editor_role->id, ['access_admin', 'manage_urls', 'view_stats']);
+            }
+        }
+        if (in_array('user', $created_role_slugs, true)) {
+            $user_role = self::get_role_by_slug('user');
+            if ($user_role) {
+                self::sync_role_permissions($user_role->id, ['access_admin']);
+            }
         }
 
-        $editor_perms = ['access_admin', 'manage_urls', 'view_stats'];
-        $editor_role = self::get_role_by_slug('editor');
-        if ($editor_role) {
-            self::sync_role_permissions($editor_role->id, $editor_perms);
-        }
-
-        $user_perms = ['access_admin'];
-        $user_role = self::get_role_by_slug('user');
-        if ($user_role) {
-            self::sync_role_permissions($user_role->id, $user_perms);
-        }
-
-        // Create default admin user from YOURLS_USER/YOURLS_PASSWD globals
+        // Create default admin user from the config.php account.
+        // The password is taken from YOURLS's $yourls_user_passwords global
+        // (cleartext on first run before YOURLS rewrites the config with a
+        // hash). No hard-coded fallback: without a strong config password,
+        // no user is seeded — the operator creates the first admin manually.
+        $config_user = '';
+        $config_pass = '';
         if (\defined('YOURLS_USER') && \YOURLS_USER !== '') {
-            $admin_user = self::get_user_by_username(\YOURLS_USER);
-            if (!$admin_user) {
-                $admin_pass = \defined('YOURLS_PASSWD') ? \YOURLS_PASSWD : 'password123';
-                self::create_user(\YOURLS_USER, $admin_pass, '', true);
-                $new_user = self::get_user_by_username(\YOURLS_USER);
+            $config_user = \YOURLS_USER;
+            $config_pass = \defined('YOURLS_PASSWD') ? (string) \YOURLS_PASSWD : '';
+        } else {
+            global $yourls_user_passwords;
+            if (!empty($yourls_user_passwords)) {
+                $config_user = (string) array_key_first($yourls_user_passwords);
+                $config_pass = (string) reset($yourls_user_passwords);
+            }
+        }
+        if ($config_user !== '' && $config_pass !== '' && !str_starts_with($config_pass, 'phpass:') && !str_starts_with($config_pass, 'md5:')
+            && self::get_user_by_username($config_user) === null) {
+            try {
+                self::create_user($config_user, $config_pass, '', true);
+                $new_user = self::get_user_by_username($config_user);
                 if ($new_user && $admin_role) {
                     self::assign_role_to_user($new_user->id, $admin_role->id);
                 }
+            } catch (\InvalidArgumentException $e) {
+                // Config password too weak for the RBAC policy — skip
+                // seeding rather than fail the whole request.
             }
         }
     }
 
     private static function sync_role_permissions(int $role_id, array $permission_slugs): void {
-        $db = self::db('write-rbac-sync_role_permissions');
+        $db = self::db('write-rbac_sync_role_permissions');
         $db->fetchAffected("DELETE FROM `" . self::table_role_permissions() . "` WHERE `role_id` = :role_id", ['role_id' => $role_id]);
 
         foreach ($permission_slugs as $slug) {
@@ -326,7 +366,7 @@ class Rbac {
             return;
         }
 
-        $db = self::db('read-rbac-load_users');
+        $db = self::db('read-rbac_load_users');
         $table = self::table_users();
         $results = $db->fetchObjects("SELECT `username`, `password` FROM `$table` WHERE `active` = 1");
 
@@ -349,22 +389,138 @@ class Rbac {
         }
     }
 
-    // --- User CRUD ---
+    /**
+     * Refuse a request the current user is not entitled to (fail closed).
+     * HTML pages get YOURLS's styled error page; API/AJAX get a clean 403.
+     */
+    public static function deny_request(): void {
+        if (\function_exists('yourls_is_API') && \yourls_is_API()) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'status'    => 'fail',
+                'code'      => 'error:permission',
+                'message'   => 'You do not have permission to perform this action',
+                'errorCode' => 403,
+            ]);
+            exit();
+        }
+        if (\function_exists('yourls_is_Ajax') && \yourls_is_Ajax()) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'status'    => 'error',
+                'code'      => 'error:permission',
+                'message'   => \function_exists('yourls__') ? \yourls__('You do not have permission to perform this action') : 'You do not have permission to perform this action',
+                'errorCode' => 403,
+            ]);
+            exit();
+        }
+        if (\function_exists('yourls_die')) {
+            \yourls_die(
+                \yourls__('You do not have permission to access this page.'),
+                \yourls__('Forbidden'),
+                403
+            );
+        }
+        http_response_code(403);
+        exit('Forbidden');
+    }
+
+    /**
+     * Standard error payload returned by the URL write guards when the
+     * current user lacks 'manage_urls'. YOURLS core/AJAX/API all merge
+     * this array into their normal response flow.
+     */
+    public static function url_write_denied(): array {
+        return [
+            'status'    => 'error',
+            'code'      => 'error:permission',
+            'message'   => \function_exists('yourls__')
+                ? \yourls__('You do not have permission to manage URLs')
+                : 'You do not have permission to manage URLs',
+            'errorCode' => 403,
+        ];
+    }
+
+    /**
+     * Permission required for a core API action ('' = public/ungated).
+     */
+    public static function required_permission_for_api(string $action): string {
+        $map = [
+            'shorturl' => 'manage_urls',
+            'stats'    => 'view_stats',
+            'db-stats' => 'view_stats',
+            'url-stats'=> 'view_stats',
+            'expand'   => 'view_stats',
+            'version'  => '',
+        ];
+        return array_key_exists($action, $map) ? (string) $map[$action] : '';
+    }
+
+    /**
+     * Permission required for a core AJAX action ('' = unknown action).
+     */
+    public static function required_permission_for_ajax(string $action): string {
+        $map = [
+            'add'          => 'manage_urls',
+            'edit_display' => 'manage_urls',
+            'edit_save'    => 'manage_urls',
+            'delete'       => 'manage_urls',
+        ];
+        return array_key_exists($action, $map) ? (string) $map[$action] : '';
+    }
+
+    /**
+     * Permission required for an admin page script ('' = unknown/ungated).
+     */
+    public static function required_permission_for_page(string $script): string {
+        $map = [
+            'index.php'   => 'access_admin',
+            'tools.php'   => 'manage_tools',
+            'plugins.php' => 'manage_plugins',
+            'upgrade.php' => 'manage_plugins',
+        ];
+        return array_key_exists($script, $map) ? (string) $map[$script] : '';
+    }
+
+    /**
+     * True when at least one active user holds the given role.
+     * Used to protect the last administrator from deletion/demotion.
+     */
+    public static function count_active_users_with_role(string $role_slug): int {
+        $db = self::db('read-rbac_count_active_users_with_role');
+        $user_roles_table = self::table_user_roles();
+        $roles_table = self::table_roles();
+        $users_table = self::table_users();
+
+        $sql = "SELECT COUNT(DISTINCT u.`id`)
+                FROM `$users_table` u
+                JOIN `$user_roles_table` ur ON u.`id` = ur.`user_id`
+                JOIN `$roles_table` r ON ur.`role_id` = r.`id`
+                WHERE r.`slug` = :slug AND u.`active` = 1";
+
+        return (int) $db->fetchValue($sql, ['slug' => $role_slug]);
+    }
+
+    /**
+     * User CRUD
+     */
 
     public static function get_user_by_id(int $id): ?object {
-        $db = self::db('read-rbac-get_user_by_id');
+        $db = self::db('read-rbac_get_user_by_id');
         $table = self::table_users();
         return $db->fetchObject("SELECT * FROM `$table` WHERE `id` = :id", ['id' => $id]) ?: null;
     }
 
     public static function get_user_by_username(string $username): ?object {
-        $db = self::db('read-rbac-get_user_by_username');
+        $db = self::db('read-rbac_get_user_by_username');
         $table = self::table_users();
         return $db->fetchObject("SELECT * FROM `$table` WHERE `username` = :username", ['username' => $username]) ?: null;
     }
 
     public static function get_all_users(): array {
-        $db = self::db('read-rbac-get_all_users');
+        $db = self::db('read-rbac_get_all_users');
         $users_table = self::table_users();
         $user_roles_table = self::table_user_roles();
         $roles_table = self::table_roles();
@@ -380,7 +536,7 @@ class Rbac {
     }
 
     public static function create_user(string $username, string $password, string $email = '', bool $active = true, array $role_ids = []): int|bool {
-        $db = self::db('write-rbac-create_user');
+        $db = self::db('write-rbac_create_user');
 
         $username = self::validate_username($username);
         $password = self::validate_password($password);
@@ -417,7 +573,7 @@ class Rbac {
     }
 
     public static function update_user(int $id, array $data): bool {
-        $db = self::db('write-rbac-update_user');
+        $db = self::db('write-rbac_update_user');
         $table = self::table_users();
 
         $fields = [];
@@ -459,12 +615,19 @@ class Rbac {
     }
 
     public static function delete_user(int $id): bool {
-        $db = self::db('write-rbac-delete_user');
+        $db = self::db('write-rbac_delete_user');
         $users_table = self::table_users();
 
         $username = $db->fetchValue("SELECT `username` FROM `$users_table` WHERE `id` = :id", ['id' => $id]);
         if (!$username) {
             return false;
+        }
+
+        // Never delete a user if that would leave no active administrator.
+        $target = self::get_user_by_id($id);
+        $target_roles = $target ? array_map(fn($r) => $r->slug, self::get_user_roles($id)) : [];
+        if (in_array('admin', $target_roles, true) && self::count_active_users_with_role('admin') <= 1) {
+            throw new \RuntimeException('Cannot delete the last active administrator');
         }
 
         $db->fetchAffected("DELETE FROM `" . self::table_user_roles() . "` WHERE `user_id` = :id", ['id' => $id]);
@@ -478,19 +641,19 @@ class Rbac {
     // --- Role CRUD ---
 
     public static function get_role_by_id(int $id): ?object {
-        $db = self::db('read-rbac-get_role_by_id');
+        $db = self::db('read-rbac_get_role_by_id');
         $table = self::table_roles();
         return $db->fetchObject("SELECT * FROM `$table` WHERE `id` = :id", ['id' => $id]) ?: null;
     }
 
     public static function get_role_by_slug(string $slug): ?object {
-        $db = self::db('read-rbac-get_role_by_slug');
+        $db = self::db('read-rbac_get_role_by_slug');
         $table = self::table_roles();
         return $db->fetchObject("SELECT * FROM `$table` WHERE `slug` = :slug", ['slug' => $slug]) ?: null;
     }
 
     public static function get_all_roles(): array {
-        $db = self::db('read-rbac-get_all_roles');
+        $db = self::db('read-rbac_get_all_roles');
         $roles_table = self::table_roles();
         $role_perms_table = self::table_role_permissions();
         $perms_table = self::table_permissions();
@@ -506,7 +669,7 @@ class Rbac {
     }
 
     public static function create_role(string $name, string $slug, string $description = ''): int|bool {
-        $db = self::db('write-rbac-create_role');
+        $db = self::db('write-rbac_create_role');
         $table = self::table_roles();
 
         $name = self::validate_name($name);
@@ -530,7 +693,7 @@ class Rbac {
     }
 
     public static function update_role(int $id, string $name, string $slug, string $description = ''): bool {
-        $db = self::db('write-rbac-update_role');
+        $db = self::db('write-rbac_update_role');
         $table = self::table_roles();
 
         $name = self::validate_name($name);
@@ -551,7 +714,7 @@ class Rbac {
     }
 
     public static function delete_role(int $id): bool {
-        $db = self::db('write-rbac-delete_role');
+        $db = self::db('write-rbac_delete_role');
         $roles_table = self::table_roles();
 
         $slug = $db->fetchValue("SELECT `slug` FROM `$roles_table` WHERE `id` = :id", ['id' => $id]);
@@ -571,25 +734,25 @@ class Rbac {
     // --- Permission CRUD ---
 
     public static function get_permission_by_id(int $id): ?object {
-        $db = self::db('read-rbac-get_permission_by_id');
+        $db = self::db('read-rbac_get_permission_by_id');
         $table = self::table_permissions();
         return $db->fetchObject("SELECT * FROM `$table` WHERE `id` = :id", ['id' => $id]) ?: null;
     }
 
     public static function get_permission_by_slug(string $slug): ?object {
-        $db = self::db('read-rbac-get_permission_by_slug');
+        $db = self::db('read-rbac_get_permission_by_slug');
         $table = self::table_permissions();
         return $db->fetchObject("SELECT * FROM `$table` WHERE `slug` = :slug", ['slug' => $slug]) ?: null;
     }
 
     public static function get_all_permissions(): array {
-        $db = self::db('read-rbac-get_all_permissions');
+        $db = self::db('read-rbac_get_all_permissions');
         $table = self::table_permissions();
         return $db->fetchObjects("SELECT * FROM `$table` ORDER BY `name`");
     }
 
     public static function create_permission(string $name, string $slug, string $description = ''): int|bool {
-        $db = self::db('write-rbac-create_permission');
+        $db = self::db('write-rbac_create_permission');
         $table = self::table_permissions();
 
         $name = self::validate_name($name);
@@ -613,7 +776,7 @@ class Rbac {
     }
 
     public static function update_permission(int $id, string $name, string $slug, string $description = ''): bool {
-        $db = self::db('write-rbac-update_permission');
+        $db = self::db('write-rbac_update_permission');
         $table = self::table_permissions();
 
         $name = self::validate_name($name);
@@ -634,7 +797,7 @@ class Rbac {
     }
 
     public static function delete_permission(int $id): bool {
-        $db = self::db('write-rbac-delete_permission');
+        $db = self::db('write-rbac_delete_permission');
         $perms_table = self::table_permissions();
 
         $slug = $db->fetchValue("SELECT `slug` FROM `$perms_table` WHERE `id` = :id", ['id' => $id]);
@@ -653,7 +816,7 @@ class Rbac {
     // --- Role Assignment ---
 
     public static function assign_role_to_user(int $user_id, int $role_id): bool {
-        $db = self::db('write-rbac-assign_role_to_user');
+        $db = self::db('write-rbac_assign_role_to_user');
         $table = self::table_user_roles();
 
         $existing = $db->fetchValue(
@@ -674,7 +837,7 @@ class Rbac {
     }
 
     public static function remove_role_from_user(int $user_id, int $role_id): bool {
-        $db = self::db('write-rbac-remove_role_from_user');
+        $db = self::db('write-rbac_remove_role_from_user');
         $table = self::table_user_roles();
 
         $result = $db->fetchAffected(
@@ -688,7 +851,7 @@ class Rbac {
     // --- Permission Assignment ---
 
     public static function assign_permission_to_role(int $role_id, int $permission_id): bool {
-        $db = self::db('write-rbac-assign_permission_to_role');
+        $db = self::db('write-rbac_assign_permission_to_role');
         $table = self::table_role_permissions();
 
         $existing = $db->fetchValue(
@@ -709,7 +872,7 @@ class Rbac {
     }
 
     public static function remove_permission_from_role(int $role_id, int $permission_id): bool {
-        $db = self::db('write-rbac-remove_permission_from_role');
+        $db = self::db('write-rbac_remove_permission_from_role');
         $table = self::table_role_permissions();
 
         $result = $db->fetchAffected(
@@ -723,7 +886,7 @@ class Rbac {
     // --- Queries ---
 
     public static function get_user_roles(int $user_id): array {
-        $db = self::db('read-rbac-get_user_roles');
+        $db = self::db('read-rbac_get_user_roles');
         $user_roles_table = self::table_user_roles();
         $roles_table = self::table_roles();
 
@@ -736,7 +899,7 @@ class Rbac {
     }
 
     public static function get_role_permissions(int $role_id): array {
-        $db = self::db('read-rbac-get_role_permissions');
+        $db = self::db('read-rbac_get_role_permissions');
         $role_perms_table = self::table_role_permissions();
         $perms_table = self::table_permissions();
 
@@ -749,7 +912,7 @@ class Rbac {
     }
 
     public static function role_has_permission(int $role_id, int $permission_id): bool {
-        $db = self::db('read-rbac-role_has_permission');
+        $db = self::db('read-rbac_role_has_permission');
         $table = self::table_role_permissions();
 
         $result = $db->fetchValue(
@@ -761,7 +924,7 @@ class Rbac {
     }
 
     public static function user_has_permission(int $user_id, string $permission_slug): bool {
-        $db = self::db('read-rbac-user_has_permission');
+        $db = self::db('read-rbac_user_has_permission');
         $user_roles_table = self::table_user_roles();
         $roles_table = self::table_roles();
         $role_perms_table = self::table_role_permissions();
@@ -779,7 +942,7 @@ class Rbac {
     }
 
     public static function user_has_role(int $user_id, string $role_slug): bool {
-        $db = self::db('read-rbac-user_has_role');
+        $db = self::db('read-rbac_user_has_role');
         $user_roles_table = self::table_user_roles();
         $roles_table = self::table_roles();
 
@@ -815,3 +978,4 @@ class Rbac {
         return self::user_has_role($user->id, $role_slug);
     }
 }
+
