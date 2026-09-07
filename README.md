@@ -40,10 +40,13 @@ Based on the RBAC model[[1]](#r-1).
    - **Editor** — `access_admin`, `manage_urls`, `view_stats`
    - **User** — `access_admin`
 
-   A first admin user is created from `YOURLS_USER` / `YOURLS_PASSWD` **only
-   if** `YOURLS_PASSWD` is set to a strong password (8+ characters). If it is
-   empty, no user is seeded — set the config credentials or create the first
-   admin manually, then log in via **Admin → User Management**.
+   A first admin user is seeded from `YOURLS_USER` / `YOURLS_PASSWD` (or the
+   first `$yourls_user_passwords` entry when `YOURLS_USER` is unset) **only
+   if** that password passes the RBAC policy — at least 8 characters and not
+   already a phpass/md5 hash. If it is empty or too weak, no user is seeded —
+   create the first admin manually, then log in via **Admin → User Management**.
+   Seeding is versioned (`rbac_seed_version` option): a schema bump re-seeds
+   on the next `admin_init`, cheaply skipped otherwise.
 5. Create users from **Admin → Plugins → your plugin admin pages → Users**.
 
 ## Usage
