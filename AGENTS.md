@@ -11,11 +11,12 @@ permissions. No core YOURLS files modified — everything hooks YOURLS seams.
 
 | Command | Action |
 |---|---|
-| `vendor/bin/phpunit --testdox` | Run all tests (no YOURLS install or DB needed) |
+| `vendor/bin/phpunit --testdox` | Run all unit tests (no YOURLS install or DB needed) |
 | `vendor/bin/phpunit --filter ValidateSlug` | Run one test class / method |
+| `cd tests/e2e && npm install && npm test` | Playwright E2E (needs Docker env up, port 8081; system Chrome via `channel: 'chrome'`) |
 | `composer install` | Install dev deps (PHPUnit) |
 | `php -l <file>` | Lint (only lint tool — no CI, run before commit) |
-| `docker compose up --build` | Dev env: YOURLS + MariaDB at http://localhost:8080, login `admin` / `password123` |
+| `docker compose up --build` | Dev env: YOURLS + MariaDB at http://localhost:8080, login `admin` / `password123` (falls back to 8081 if 8080 taken — set `RBAC_E2E_BASE_URL` to override) |
 
 No typecheck/lint toolchain beyond `php -l`. Verify changes with phpunit.
 
@@ -75,6 +76,9 @@ No typecheck/lint toolchain beyond `php -l`. Verify changes with phpunit.
 - PHPUnit, tests in `tests/Unit/` for pure logic in `includes/rbac.php`
   (validation, permission maps, denial payloads, slug policy). Bootstrap
   (`tests/bootstrap.php`) stubs YOURLS — no installation or DB required.
+- Playwright E2E in `tests/e2e/` against the Docker env (serialized workers —
+  tests share DB state; helpers in `specs/helpers.js` do nonce-scraping
+  login, menu-link logout, RBAC page nav).
 - Arrange/Act/Assert with `// Given / When / Then` comments.
 - Naming: `testMethodName_WithCondition_ExpectedResult`.
 

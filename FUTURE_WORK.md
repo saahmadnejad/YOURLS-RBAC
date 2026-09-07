@@ -2,12 +2,12 @@
 
 ## Testing
 
-### UI Testing with Playwright
-- Add end-to-end tests that exercise the RBAC admin pages (Users, Roles, Permissions) through a headless browser
-- Test the full workflow: create user → assign role → verify permission → edit user → delete user
-- Test nonce/form submission (the field naming collision issue, see below)
-- Test permission enforcement (non-admin users cannot access RBAC pages)
-- Test form validation error display
+### UI Testing with Playwright — DONE
+Covered by `tests/e2e/` (see README → End-to-end tests): RBAC admin pages,
+full user workflow, field-collision regression, permission enforcement,
+protected-slug guards. Remaining ideas:
+- Role and permission CRUD workflows (currently user-focused)
+- API authentication paths (signature / userless modes)
 
 ### UI Testing with Electron
 - Package a desktop app that loads YOURLS admin in an Electron wrapper

@@ -246,6 +246,24 @@ composer install
 vendor/bin/phpunit --testdox
 ```
 
+### End-to-end tests (Playwright)
+
+With the Docker environment running:
+
+```bash
+cd tests/e2e
+npm install
+npm test
+```
+
+The suite covers the admin pages (users, roles, permissions), the full
+user lifecycle (create → assign role → edit → delete), the field-name
+collision regression, permission enforcement (403 for under-privileged
+users, URL-write denial), and the protected-slug guards. Tests run
+serialized against a shared DB and use system Chrome (`channel: 'chrome'`)
+so no browser download is needed. Set `RBAC_E2E_BASE_URL` if the app is not
+on port 8081.
+
 ## References
 
 <a id="r-1">[1]</a>
