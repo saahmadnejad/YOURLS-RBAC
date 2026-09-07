@@ -760,14 +760,15 @@ class Rbac {
         if (!$existing) {
             return false;
         }
-        // The admin slug is reserved — renaming to it is as forbidden as
-        // renaming it away (the guards elsewhere key on this slug).
+        // The admin slug is reserved — renaming to it or away from it is
+        // forbidden (the guards elsewhere key on this slug).
         if ($slug !== $existing->slug) {
-            if (in_array($slug, self::PROTECTED_ROLE_SLUGS, true)) {
+            if (in_array($existing->slug, self::PROTECTED_ROLE_SLUGS, true)
+                || in_array($slug, self::PROTECTED_ROLE_SLUGS, true)) {
                 throw new \InvalidArgumentException('The Administrator role slug cannot be changed');
             }
             if (self::get_role_by_slug($slug)) {
-                return false; // duplicate slug
+                throw new \RuntimeException('Slug already in use');
             }
         }
 
@@ -862,11 +863,12 @@ class Rbac {
             return false;
         }
         if ($slug !== $existing->slug) {
-            if (in_array($slug, self::PROTECTED_PERMISSION_SLUGS, true)) {
+            if (in_array($existing->slug, self::PROTECTED_PERMISSION_SLUGS, true)
+                || in_array($slug, self::PROTECTED_PERMISSION_SLUGS, true)) {
                 throw new \InvalidArgumentException('The slug of a core permission cannot be changed');
             }
             if (self::get_permission_by_slug($slug)) {
-                return false; // duplicate slug
+                throw new \RuntimeException('Slug already in use');
             }
         }
 

@@ -106,13 +106,6 @@ function yourls_rbac_required_permission(): string {
  * @return void
  */
 function yourls_rbac_enforce() {
-    // Plugin (de)activation is a 'manage_plugins' action in disguise.
-    if (\yourls_is_admin() && basename($_SERVER['SCRIPT_NAME'] ?? '') === 'plugins.php'
-        && isset($_GET['action'], $_GET['plugin'])
-        && in_array($_GET['action'], ['activate', 'deactivate'], true)) {
-        yourls_rbac_require('manage_plugins');
-    }
-
     $permission = yourls_rbac_required_permission();
     if ($permission !== '' && !yourls_rbac_can($permission)) {
         \YOURLS\RBAC\Rbac::deny_request();
