@@ -1,0 +1,11 @@
+{
+  "name": "yourls-rbac-e2e",
+  "private": true,
+  "description": "Playwright E2E tests for the YOURLS-RBAC plugin (requires the Docker dev env)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
