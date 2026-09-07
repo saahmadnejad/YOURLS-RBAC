@@ -31,21 +31,10 @@ if (isset($_POST['save_role'])) {
     $id = (int) ($_POST['role_id'] ?? 0);
     $permission_slugs = is_array($_POST['permission_slugs'] ?? null) ? $_POST['permission_slugs'] : [];
 
-    // Protected slugs cannot be renamed or repointed — guards core seeds.
-    $protected_slugs = ['admin'];
-    if ($id > 0) {
-        $existing = Rbac::get_role_by_id($id);
-        if ($existing && in_array($existing->slug, $protected_slugs, true) && $slug !== $existing->slug) {
-            yourls_add_notice(yourls__('The Administrator role slug cannot be changed.'));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
-            exit();
-        }
-    }
-
     if ($id > 0) {
         try {
             Rbac::update_role($id, $name, $slug, $desc);
-        } catch (\InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
             yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
             exit();
@@ -116,9 +105,7 @@ if ($action === 'delete' && isset($_REQUEST['id'])) {
     yourls_verify_nonce('rbac_delete_role');
     if ($role_id > 0) {
         $role = Rbac::get_role_by_id($role_id);
-        if ($role && $role->slug === 'admin') {
-            yourls_add_notice(yourls__('Cannot delete the Administrator role.'));
-        } elseif ($role) {
+        if ($role) {
             // Deleting a role you hold would demote you mid-session.
             $is_self = false;
             if (defined('YOURLS_USER')) {
@@ -135,8 +122,12 @@ if ($action === 'delete' && isset($_REQUEST['id'])) {
             if ($is_self) {
                 yourls_add_notice(yourls__('You cannot delete a role assigned to you.'));
             } else {
-                $result = Rbac::delete_role($role_id);
-                yourls_add_notice($result ? yourls__('Role deleted.') : yourls__('Failed to delete role.'));
+                try {
+                    $result = Rbac::delete_role($role_id);
+                    yourls_add_notice($result ? yourls__('Role deleted.') : yourls__('Failed to delete role.'));
+                } catch (\RuntimeException $e) {
+                    yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
+                }
             }
         }
     }

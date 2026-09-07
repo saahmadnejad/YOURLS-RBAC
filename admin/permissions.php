@@ -32,17 +32,10 @@ if (isset($_POST['save_permission'])) {
     $id = (int) ($_POST['perm_id'] ?? 0);
 
     if ($id > 0) {
-        // Core permission slugs cannot be renamed — they gate the admin UI.
-        $existing = Rbac::get_permission_by_id($id);
-        if ($existing && in_array($existing->slug, ['access_admin', 'manage_users', 'manage_roles', 'manage_permissions'], true) && $slug !== $existing->slug) {
-            yourls_add_notice(yourls__('The slug of a core permission cannot be changed.'));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
-            exit();
-        }
         try {
             $result = Rbac::update_permission($id, $name, $slug, $desc);
             $msg = $result ? yourls__('Permission updated.') : yourls__('Failed to update permission.');
-        } catch (\InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
             yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
             exit();
@@ -72,11 +65,13 @@ if ($action === 'delete' && isset($_REQUEST['id'])) {
     yourls_verify_nonce('rbac_delete_permission');
     if ($perm_id > 0) {
         $perm = Rbac::get_permission_by_id($perm_id);
-        if ($perm && in_array($perm->slug, ['access_admin', 'manage_users', 'manage_roles', 'manage_permissions'], true)) {
-            yourls_add_notice(yourls__('Cannot delete a core permission. (It is required for the admin interface to stay usable.)'));
-        } elseif ($perm) {
-            $result = Rbac::delete_permission($perm_id);
-            $msg = $result ? yourls_s('Permission "%s" deleted.', $perm->name) : yourls__('Failed to delete permission.');
+        if ($perm) {
+            try {
+                $result = Rbac::delete_permission($perm_id);
+                $msg = $result ? yourls_s('Permission "%s" deleted.', $perm->name) : yourls__('Failed to delete permission.');
+            } catch (\RuntimeException $e) {
+                $msg = yourls__('Error: ' . $e->getMessage());
+            }
             yourls_add_notice($msg);
         }
     }

@@ -20,7 +20,7 @@ class UrlWriteDeniedTest extends TestCase
 
         // Then: it signals an error with a 403 code
         $this->assertSame('error', $payload['status']);
-        $this->assertSame(403, $payload['errorCode']);
+        $this->assertSame('403', $payload['errorCode']);
     }
 
     public function testUrlWriteDenied_ReturnsMachineReadableCode(): void
@@ -41,6 +41,18 @@ class UrlWriteDeniedTest extends TestCase
 
         // Then: a non-empty message is present (untranslated outside YOURLS)
         $this->assertSame('You do not have permission to manage URLs', $payload['message']);
+    }
+
+    public function testUrlWriteDenied_ErrorCodeIsStringLikeCoreApiPayloads(): void
+    {
+        // Given: YOURLS core emits errorCode as a string ('403' in
+        // includes/auth.php, '404' in functions-api.php)
+        // When: building the RBAC denial payload
+        $payload = Rbac::url_write_denied();
+
+        // Then: the errorCode is a string so type-sensitive clients see
+        // the same shape as core API errors
+        $this->assertIsString($payload['errorCode']);
     }
 
     public function testUrlWriteDenied_ContainsNoSuperglobalLeakage(): void

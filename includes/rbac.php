@@ -6,6 +6,20 @@ use YOURLS\Database\YDB;
 
 class Rbac {
 
+    /**
+     * Role slugs the plugin treats as system-managed. They cannot be
+     * renamed away from, renamed to, or deleted — guards elsewhere
+     * (enforcement maps, admin-role always-keeps-all-permissions) key
+     * on these exact slugs.
+     */
+    public const PROTECTED_ROLE_SLUGS = ['admin'];
+
+    /**
+     * Permission slugs that keep the admin interface usable. They cannot
+     * be deleted or renamed.
+     */
+    public const PROTECTED_PERMISSION_SLUGS = ['access_admin', 'manage_users', 'manage_roles', 'manage_permissions'];
+
     public static function table_users(): string {
         return defined('YOURLS_RBAC_TABLE_USERS') ? \YOURLS_RBAC_TABLE_USERS : \YOURLS_DB_PREFIX . 'rbac_users';
     }
@@ -241,6 +255,13 @@ class Rbac {
         }
     }
 
+    /**
+     * Seed schema version. Bump when seed_defaults() changes (new
+     * permissions/roles, new default permission sets) so existing installs
+     * re-run the seed once per version — not on every admin request.
+     */
+    public const SEED_VERSION = 2;
+
     public static function seed_defaults(): void {
         $permissions = [
             ['name' => 'Access Admin',        'slug' => 'access_admin',       'description' => 'Can access the admin interface'],
@@ -345,6 +366,27 @@ class Rbac {
                 // seeding rather than fail the whole request.
             }
         }
+
+        // Record seed version so admin_init can skip seeding with one
+        // cheap get_option until the next schema bump.
+        \yourls_update_option('rbac_seed_version', self::SEED_VERSION);
+    }
+
+    /**
+     * Run seed_defaults() only when needed: tables missing, or seed schema
+     * older than the current version. Cost when current: one get_option
+     * (plus one SHOW TABLES on installs that have not seeded yet).
+     */
+    public static function maybe_seed_defaults(): void {
+        if (!self::tables_exist()) {
+            self::create_tables();
+            self::seed_defaults();
+            return;
+        }
+        $seeded = (int) \yourls_get_option('rbac_seed_version', 0);
+        if ($seeded < self::SEED_VERSION) {
+            self::seed_defaults();
+        }
     }
 
     private static function sync_role_permissions(int $role_id, array $permission_slugs): void {
@@ -401,7 +443,7 @@ class Rbac {
                 'status'    => 'fail',
                 'code'      => 'error:permission',
                 'message'   => 'You do not have permission to perform this action',
-                'errorCode' => 403,
+                'errorCode' => '403',
             ]);
             exit();
         }
@@ -412,7 +454,7 @@ class Rbac {
                 'status'    => 'error',
                 'code'      => 'error:permission',
                 'message'   => \function_exists('yourls__') ? \yourls__('You do not have permission to perform this action') : 'You do not have permission to perform this action',
-                'errorCode' => 403,
+                'errorCode' => '403',
             ]);
             exit();
         }
@@ -433,13 +475,15 @@ class Rbac {
      * this array into their normal response flow.
      */
     public static function url_write_denied(): array {
+        // errorCode is a string to match YOURLS core's API payloads
+        // (see functions-api.php / auth.php: '404', '403', ...).
         return [
             'status'    => 'error',
             'code'      => 'error:permission',
             'message'   => \function_exists('yourls__')
                 ? \yourls__('You do not have permission to manage URLs')
                 : 'You do not have permission to manage URLs',
-            'errorCode' => 403,
+            'errorCode' => '403',
         ];
     }
 
@@ -590,8 +634,20 @@ class Rbac {
             $binds['email'] = $email;
         }
         if (isset($data['active'])) {
+            // Deactivating a user must not leave the install without a
+            // single active administrator (mirrors delete_user's guard).
+            $target = self::get_user_by_id($id);
+            $was_active = $target && (int) $target->active === 1;
+            $new_active = (int) $data['active'];
+            if ($was_active && $new_active === 0) {
+                $target_roles = $target ? array_map(fn($r) => $r->slug, self::get_user_roles($id)) : [];
+                if (in_array('admin', $target_roles, true)
+                    && self::count_active_users_with_role('admin') <= 1) {
+                    throw new \RuntimeException('Cannot deactivate the last active administrator');
+                }
+            }
             $fields[] = '`active` = :active';
-            $binds['active'] = (int) $data['active'];
+            $binds['active'] = $new_active;
         }
         if (isset($data['password'])) {
             $password = self::validate_password($data['password']);
@@ -700,6 +756,21 @@ class Rbac {
         $slug = self::validate_slug($slug);
         $description = self::validate_description($description);
 
+        $existing = self::get_role_by_id($id);
+        if (!$existing) {
+            return false;
+        }
+        // The admin slug is reserved — renaming to it is as forbidden as
+        // renaming it away (the guards elsewhere key on this slug).
+        if ($slug !== $existing->slug) {
+            if (in_array($slug, self::PROTECTED_ROLE_SLUGS, true)) {
+                throw new \InvalidArgumentException('The Administrator role slug cannot be changed');
+            }
+            if (self::get_role_by_slug($slug)) {
+                return false; // duplicate slug
+            }
+        }
+
         $result = $db->fetchAffected(
             "UPDATE `$table` SET `name` = :name, `slug` = :slug, `description` = :description WHERE `id` = :id",
             [
@@ -720,6 +791,9 @@ class Rbac {
         $slug = $db->fetchValue("SELECT `slug` FROM `$roles_table` WHERE `id` = :id", ['id' => $id]);
         if (!$slug) {
             return false;
+        }
+        if (in_array($slug, self::PROTECTED_ROLE_SLUGS, true)) {
+            throw new \RuntimeException('Cannot delete the Administrator role');
         }
 
         $db->fetchAffected("DELETE FROM `" . self::table_role_permissions() . "` WHERE `role_id` = :id", ['id' => $id]);
@@ -783,6 +857,19 @@ class Rbac {
         $slug = self::validate_slug($slug);
         $description = self::validate_description($description);
 
+        $existing = self::get_permission_by_id($id);
+        if (!$existing) {
+            return false;
+        }
+        if ($slug !== $existing->slug) {
+            if (in_array($slug, self::PROTECTED_PERMISSION_SLUGS, true)) {
+                throw new \InvalidArgumentException('The slug of a core permission cannot be changed');
+            }
+            if (self::get_permission_by_slug($slug)) {
+                return false; // duplicate slug
+            }
+        }
+
         $result = $db->fetchAffected(
             "UPDATE `$table` SET `name` = :name, `slug` = :slug, `description` = :description WHERE `id` = :id",
             [
@@ -803,6 +890,9 @@ class Rbac {
         $slug = $db->fetchValue("SELECT `slug` FROM `$perms_table` WHERE `id` = :id", ['id' => $id]);
         if (!$slug) {
             return false;
+        }
+        if (in_array($slug, self::PROTECTED_PERMISSION_SLUGS, true)) {
+            throw new \RuntimeException('Cannot delete a core permission');
         }
 
         $db->fetchAffected("DELETE FROM `" . self::table_role_permissions() . "` WHERE `permission_id` = :id", ['id' => $id]);
@@ -837,6 +927,18 @@ class Rbac {
     }
 
     public static function remove_role_from_user(int $user_id, int $role_id): bool {
+        // Removing the admin role must not leave the install without a
+        // single active administrator (mirrors delete_user's guard; the
+        // admin pages check early for nicer UX, this is the enforcement).
+        $role = self::get_role_by_id($role_id);
+        if ($role && $role->slug === 'admin') {
+            $target = self::get_user_by_id($user_id);
+            if ($target && (int) $target->active === 1
+                && self::count_active_users_with_role('admin') <= 1) {
+                throw new \RuntimeException('Cannot remove the administrator role from the last active administrator');
+            }
+        }
+
         $db = self::db('write-rbac_remove_role_from_user');
         $table = self::table_user_roles();
 

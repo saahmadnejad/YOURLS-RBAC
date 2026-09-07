@@ -41,4 +41,7 @@ if ( defined('YOURLS_RBAC_DROP_DATA') && YOURLS_RBAC_DROP_DATA ) {
     }
 }
 
+// Clean up the seed-version marker so a future activation re-seeds cleanly.
+yourls_delete_option( 'rbac_seed_version' );
+
 yourls_do_action( 'rbac_uninstall' );
