@@ -122,6 +122,9 @@ Additional lockout guards (all enforced server-side):
 - You cannot remove `manage_roles` from a role assigned to yourself.
 - Destructive actions (delete user/role/permission) are POST-only with
   nonces — no state changes via GET links.
+- Deleting a non-protected permission (e.g. `manage_urls`, `view_stats`,
+  `manage_plugins`, `manage_tools`) is allowed, but roles holding it
+  silently lose that capability — assign carefully.
 
 ## Database schema
 
