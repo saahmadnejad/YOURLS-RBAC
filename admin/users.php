@@ -68,15 +68,12 @@ if (isset($_POST['save_user'])) {
             'email'    => $email,
             'active'   => $active,
         ];
-        if ($is_self && $active === 0) {
-            unset($update_data['active']);
-        }
         if (!empty($password)) {
             $update_data['password'] = $password;
         }
         try {
             Rbac::update_user($id, $update_data);
-        } catch (\InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
             yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
             exit();
@@ -90,7 +87,13 @@ if (isset($_POST['save_user'])) {
         }
         foreach ($current_role_ids as $current_id) {
             if (!in_array($current_id, $role_ids)) {
-                Rbac::remove_role_from_user($id, $current_id);
+                try {
+                    Rbac::remove_role_from_user($id, $current_id);
+                } catch (\RuntimeException $e) {
+                    yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
+                    yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
+                    exit();
+                }
             }
         }
 

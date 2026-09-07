@@ -185,14 +185,12 @@ function yourls_rbac_activate($plugin) {
 yourls_add_action('activated_plugin', 'yourls_rbac_activate');
 
 /**
- * On admin_init: ensure tables exist and defaults are seeded (idempotent —
- * also backfills new permissions/roles on upgrades of pre-existing installs).
+ * On admin_init: ensure tables exist and the seed schema is current.
+ * Cheap in the steady state — one get_option — because seed_defaults()
+ * stamps rbac_seed_version and only re-runs when it lags SEED_VERSION.
  */
 function yourls_rbac_maybe_init() {
-    if (!\YOURLS\RBAC\Rbac::tables_exist()) {
-        \YOURLS\RBAC\Rbac::create_tables();
-    }
-    \YOURLS\RBAC\Rbac::seed_defaults();
+    \YOURLS\RBAC\Rbac::maybe_seed_defaults();
 }
 yourls_add_action('admin_init', 'yourls_rbac_maybe_init');
 
