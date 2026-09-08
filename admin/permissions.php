@@ -141,12 +141,14 @@ $permissions = Rbac::get_all_permissions();
             <td><?php echo yourls_esc_html($p->description ?? ''); ?></td>
             <td>
                 <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_permissions&action=edit&id=' . $p->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
+                <?php if (!in_array($p->slug, Rbac::PROTECTED_PERMISSION_SLUGS, true)): ?>
                 <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_permissions&action=delete&id=' . $p->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
                     <?php yourls_nonce_field('rbac_delete_permission'); ?>
                     <input type="hidden" name="id" value="<?php echo (int) $p->id; ?>" />
                     <input type="hidden" name="action" value="delete" />
                     <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
                 </form>
+                <?php endif; ?>
             </td>
         </tr>
         <?php endforeach; ?>

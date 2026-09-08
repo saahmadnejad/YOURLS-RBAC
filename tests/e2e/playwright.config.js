@@ -4,6 +4,7 @@ const BASE = process.env.RBAC_E2E_BASE_URL || 'http://localhost:8081';
 
 export default defineConfig({
   testDir: './specs',
+  globalSetup: require.resolve('./global-setup.js'),
   timeout: 30_000,
   retries: 0,
   workers: 1, // tests share DB state; serialize

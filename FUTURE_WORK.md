@@ -5,9 +5,13 @@
 ### UI Testing with Playwright — DONE
 Covered by `tests/e2e/` (see README → End-to-end tests): RBAC admin pages,
 full user workflow, field-collision regression, permission enforcement,
-protected-slug guards. Remaining ideas:
-- Role and permission CRUD workflows (currently user-focused)
-- API authentication paths (signature / userless modes)
+URL edit/delete guards, lockout guards, inactive-login refusal, role and
+permission CRUD with permission sync, protected-slug guards. Remaining
+ideas:
+- API authentication paths (signature / userless modes) with JSON 403
+  payload assertions against `yourls-api.php`
+- Role/permission pages: negative validation (invalid slug characters,
+  duplicate slug error notices)
 
 ### UI Testing with Electron
 - Package a desktop app that loads YOURLS admin in an Electron wrapper
