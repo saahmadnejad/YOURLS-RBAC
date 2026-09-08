@@ -5,6 +5,7 @@ if( !defined( 'YOURLS_ABSPATH' ) ) die();
 use YOURLS\RBAC\Rbac;
 
 $action = in_array($_GET['action'] ?? '', ['edit', 'delete', ''], true) ? ($_GET['action'] ?? '') : '';
+$form_error = '';
 $perm_id = 0;
 $perm_name = '';
 $perm_slug = '';
@@ -35,18 +36,18 @@ if (isset($_POST['save_permission'])) {
             $result = Rbac::update_permission($id, $name, $slug, $desc);
             $msg = $result ? yourls__('Permission updated.') : yourls__('Failed to update permission.');
         } catch (\InvalidArgumentException | \RuntimeException $e) {
-            yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
-            exit();
+            $form_error = yourls__('Error: ' . $e->getMessage());
+            $action = '';
+            goto rbac_render_permissions;
         }
     } else {
         try {
             $result = Rbac::create_permission($name, $slug, $desc);
             $msg = $result ? yourls__('Permission created.') : yourls__('Failed to create permission. (Slug may already exist.)');
         } catch (\InvalidArgumentException $e) {
-            yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
-            exit();
+            $form_error = yourls__('Error: ' . $e->getMessage());
+            $action = '';
+            goto rbac_render_permissions;
         }
     }
 
@@ -79,11 +80,16 @@ if ($action === 'delete' && isset($_REQUEST['id'])) {
     exit();
 }
 
+rbac_render_permissions:
 $permissions = Rbac::get_all_permissions();
 ?>
 
 <div class="rbac-wrap">
     <h2><?php yourls_e('RBAC Permissions'); ?></h2>
+
+    <?php if ($form_error !== ''): ?>
+    <div class="rbac-error" role="alert"><?php echo yourls_esc_html($form_error); ?></div>
+    <?php endif; ?>
     <p><?php yourls_e('Permissions define granular capabilities. Assign them to roles to control what users can do.'); ?></p>
 
     <div class="rbac-card">

@@ -4,13 +4,56 @@
   'use strict';
 
   function init() {
-    // --- Search / filter for .rbac-list items ---
+    // --- Theme toggle (optional dark mode; default follows the OS) ---
+    // Stored choice lives on <html data-rbac-theme>; when unset, the CSS
+    // media query follows prefers-color-scheme.
+    var html = document.documentElement;
+    var KEY = 'rbac-theme';
+    var apply = function (theme) {
+      if (theme === 'auto') {
+        html.removeAttribute('data-rbac-theme');
+      } else {
+        html.setAttribute('data-rbac-theme', theme);
+      }
+    };
+    // re-apply any stored choice (covers bfcache page restores)
+    apply(localStorage.getItem(KEY) || 'auto');
+
+    document.querySelectorAll('.rbac-toolbar').forEach(function (bar) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'rbac-theme-toggle';
+      var label = function () {
+        var current = html.getAttribute('data-rbac-theme')
+          || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        btn.textContent = current === 'dark' ? '☀' : '☾';
+        btn.title = current === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+      };
+      btn.addEventListener('click', function () {
+        var current = html.getAttribute('data-rbac-theme')
+          || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var next = current === 'dark' ? 'light' : 'dark';
+        apply(next);
+        localStorage.setItem(KEY, next);
+        label();
+      });
+      label();
+      bar.appendChild(btn);
+    });
+
+    // --- Search / filter for .rbac-list items and matrix rows ---
     document.querySelectorAll('input.rbac-search').forEach(function (input) {
       var list = document.querySelector(input.getAttribute('data-rbac-target'));
       if (!list) return;
+      var rows = function () {
+        // card lists use .rbac-item, the matrix uses tbody tr
+        return list.classList.contains('rbac-matrix-wrap')
+          ? list.querySelectorAll('tbody tr')
+          : list.querySelectorAll('.rbac-item');
+      };
       input.addEventListener('input', function () {
         var q = input.value.trim().toLowerCase();
-        list.querySelectorAll('.rbac-item').forEach(function (item) {
+        rows().forEach(function (item) {
           var match = !q || item.textContent.toLowerCase().indexOf(q) !== -1;
           item.classList.toggle('is-hidden', !match);
         });

@@ -55,6 +55,18 @@ input.rbac-search:focus {
   border-color: var(--rbac-accent);
 }
 
+/* --- Inline form error (validation / guard refusals) --- */
+.rbac-error {
+  background: #fdf0ee;
+  border: 1px solid #f2cfc9;
+  border-radius: var(--rbac-radius);
+  color: var(--rbac-danger);
+  padding: 10px 14px;
+}
+html[data-rbac-theme="dark"] .rbac-error {
+  background: #3a2422;
+}
+
 /* --- Forms: grid rows instead of the old th/td table --- */
 .rbac-form {
   display: grid;
@@ -64,7 +76,7 @@ input.rbac-search:focus {
 }
 .rbac-form label, .rbac-form .rbac-field-label {
   font-weight: bold;
-  text-align: right;
+  text-align: end; /* logical: right in LTR, left in RTL */
   padding-top: 5px;
 }
 .rbac-form input[type="text"],
@@ -171,9 +183,13 @@ input.rbac-search:focus {
 .rbac-item .rbac-item-actions {
   display: flex;
   gap: 6px;
-  margin-left: auto;
+  margin-inline-start: auto; /* pushes to the far side in either direction */
 }
 .rbac-item.is-hidden {
+  display: none;
+}
+/* search-filtered matrix rows */
+table.rbac-matrix tbody tr.is-hidden {
   display: none;
 }
 .rbac-badge {
@@ -230,7 +246,7 @@ dialog#rbac-confirm-dialog .rbac-confirm-actions {
   border-radius: 4px;
   background: #e3e8ee;
   overflow: hidden;
-  margin-left: 8px;
+  margin-inline-start: 8px;
 }
 .rbac-meter span {
   display: block;
@@ -247,22 +263,28 @@ dialog#rbac-confirm-dialog .rbac-confirm-actions {
 .rbac-meter-label {
   font-size: 11px;
   color: var(--rbac-muted);
-  margin-left: 6px;
+  margin-inline-start: 6px;
 }
 
 /* --- Permission matrix (roles x permissions) --- */
+/* The matrix scrolls INSIDE its own box instead of stretching the page:
+   the wrapper is capped to the card width and the table can overflow it. */
 .rbac-matrix-wrap {
   overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 table.rbac-matrix {
   border-collapse: collapse;
   font-size: 12px;
-  min-width: 100%;
+  width: max-content; /* natural width; wrap scrolls when it exceeds */
+  max-width: none;
 }
 table.rbac-matrix th, table.rbac-matrix td {
   border: 1px solid var(--rbac-border);
   padding: 6px 10px;
   text-align: center;
+  white-space: nowrap; /* keep slug columns tight, enable horizontal scroll */
 }
 table.rbac-matrix thead th {
   background: var(--rbac-accent-soft);
@@ -270,9 +292,16 @@ table.rbac-matrix thead th {
   position: sticky;
   top: 0;
 }
-table.rbac-matrix tbody th {
-  text-align: left;
+/* Sticky first column while horizontally scrolling the matrix */
+table.rbac-matrix tbody th,
+table.rbac-matrix thead th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 2;
   background: var(--rbac-page-bg);
+}
+table.rbac-matrix tbody th {
+  text-align: start;
   font-weight: bold;
 }
 table.rbac-matrix input[type="checkbox"] {
@@ -289,13 +318,23 @@ table.rbac-matrix tbody tr.is-protected input[type="checkbox"] {
   opacity: 0.4;
 }
 
+/* --- RTL: mirror what logical properties can't (YOURLS sets dir=rtl for
+   locales like fa_IR — see yourls_is_rtl()) --- */
+[dir="rtl"] table.rbac-matrix tbody th {
+  text-align: start;
+}
+[dir="rtl"] .rbac-confirm-actions {
+  /* dialog buttons: primary on the left in RTL */
+  flex-direction: row-reverse;
+}
+
 /* --- Responsive: single column on small screens --- */
 @media (max-width: 640px) {
   .rbac-form {
     grid-template-columns: 1fr;
   }
   .rbac-form label, .rbac-form .rbac-field-label {
-    text-align: left;
+    text-align: start; /* logical: flips with dir */
     padding-top: 0;
   }
   .rbac-hint {
@@ -303,9 +342,48 @@ table.rbac-matrix tbody tr.is-protected input[type="checkbox"] {
   }
 }
 
-/* --- Dark mode: follow the OS setting, plugin pages only --- */
+/* --- Theme: explicit override wins, OS setting as default --- */
+/* Dark palette, applied either when the toggle sets data-rbac-theme=dark
+   or, with no stored choice, when the OS prefers dark. */
+html[data-rbac-theme="dark"] {
+  --rbac-accent: #3f9fd6;
+  --rbac-accent-soft: #1d3346;
+  --rbac-border: #31465c;
+  --rbac-text: #c9d4de;
+  --rbac-muted: #8fa3b5;
+  --rbac-danger: #e0705f;
+  --rbac-card-bg: #1b2735;
+  --rbac-page-bg: #223140;
+}
+html[data-rbac-theme="dark"] .rbac-item .rbac-item-title,
+html[data-rbac-theme="dark"] .rbac-toggle .rbac-toggle-label,
+html[data-rbac-theme="dark"] .rbac-form label,
+html[data-rbac-theme="dark"] .rbac-form .rbac-field-label {
+  color: var(--rbac-text);
+}
+html[data-rbac-theme="dark"] .rbac-badge.rbac-badge-off {
+  background: #2c3a4a;
+}
+html[data-rbac-theme="dark"] dialog#rbac-confirm-dialog {
+  color: var(--rbac-text);
+  background: var(--rbac-card-bg);
+}
+html[data-rbac-theme="dark"] input.rbac-search,
+html[data-rbac-theme="dark"] .rbac-form input[type="text"],
+html[data-rbac-theme="dark"] .rbac-form input[type="email"],
+html[data-rbac-theme="dark"] .rbac-form input[type="password"] {
+  color: var(--rbac-text);
+  background: var(--rbac-page-bg);
+}
+html[data-rbac-theme="dark"] .rbac-item,
+html[data-rbac-theme="dark"] table.rbac-matrix tbody th {
+  background: var(--rbac-page-bg);
+}
+html[data-rbac-theme="dark"] table.rbac-matrix thead th {
+  background: var(--rbac-accent-soft);
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-rbac-theme]) {
     --rbac-accent: #3f9fd6;
     --rbac-accent-soft: #1d3346;
     --rbac-border: #31465c;
@@ -315,18 +393,45 @@ table.rbac-matrix tbody tr.is-protected input[type="checkbox"] {
     --rbac-card-bg: #1b2735;
     --rbac-page-bg: #223140;
   }
-  .rbac-item .rbac-item-title,
-  .rbac-toggle .rbac-toggle-label,
-  .rbac-form label, .rbac-form .rbac-field-label {
+  html:not([data-rbac-theme]) .rbac-item .rbac-item-title,
+  html:not([data-rbac-theme]) .rbac-toggle .rbac-toggle-label,
+  html:not([data-rbac-theme]) .rbac-form label,
+  html:not([data-rbac-theme]) .rbac-form .rbac-field-label {
     color: var(--rbac-text);
   }
-  .rbac-badge.rbac-badge-off {
+  html:not([data-rbac-theme]) .rbac-badge.rbac-badge-off {
     background: #2c3a4a;
   }
-  dialog#rbac-confirm-dialog {
+  html:not([data-rbac-theme]) dialog#rbac-confirm-dialog {
     color: var(--rbac-text);
+    background: var(--rbac-card-bg);
   }
-  input.rbac-search {
+  html:not([data-rbac-theme]) input.rbac-search,
+  html:not([data-rbac-theme]) .rbac-form input[type="text"],
+  html:not([data-rbac-theme]) .rbac-form input[type="email"],
+  html:not([data-rbac-theme]) .rbac-form input[type="password"] {
     color: var(--rbac-text);
+    background: var(--rbac-page-bg);
   }
+  html:not([data-rbac-theme]) .rbac-item,
+  html:not([data-rbac-theme]) table.rbac-matrix tbody th {
+    background: var(--rbac-page-bg);
+  }
+  html:not([data-rbac-theme]) table.rbac-matrix thead th {
+    background: var(--rbac-accent-soft);
+  }
+}
+
+/* --- Theme toggle button --- */
+button.rbac-theme-toggle {
+  border: 1px solid var(--rbac-border);
+  background: var(--rbac-card-bg);
+  color: var(--rbac-text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+button.rbac-theme-toggle:hover {
+  border-color: var(--rbac-accent);
 }
