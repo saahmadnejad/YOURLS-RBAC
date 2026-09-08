@@ -22,8 +22,15 @@ Implemented in `admin/rbac-ui.css` + `admin/rbac-ui.js` (vanilla, no deps):
 - Password strength meter on user creation
 - Client-side slug pattern hint (roles / permissions)
 - Permission matrix grid (roles × permissions) on the Roles page
-- Dark mode via `prefers-color-scheme`, plugin pages only
-- Responsive single-column forms on small screens
+- Dark mode via `prefers-color-scheme` (plugin pages only), plus an optional
+  per-browser toggle (toolbar button, localStorage, `data-rbac-theme`)
+- RTL support: logical CSS properties + `[dir="rtl"]` overrides (YOURLS sets
+  `dir=rtl` for RTL locales — see `yourls_is_rtl()`)
+- Permission matrix scrolls inside its own wrapper (sticky first column),
+  never stretches the page
+- Validation/guard errors render inline (`.rbac-error`) — YOURLS notices
+  (`yourls_add_notice`) are lost on redirect AND fire before the plugin
+  page body, so they can't carry form errors
 
 Remaining ideas:
 - Pagination for large user/role lists (currently all rows render)

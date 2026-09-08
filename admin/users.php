@@ -5,6 +5,7 @@ if( !defined( 'YOURLS_ABSPATH' ) ) die();
 use YOURLS\RBAC\Rbac;
 
 $action = in_array($_GET['action'] ?? '', ['edit', 'delete', ''], true) ? ($_GET['action'] ?? '') : '';
+$form_error = '';
 $user_id = 0;
 $user_username = '';
 $user_password = '';
@@ -37,12 +38,15 @@ if (isset($_POST['save_user'])) {
     if ($id > 0) {
         // Editing your own account? Deactivating or demoting yourself (or the
         // last active admin) is refused to prevent lockouts.
+        // Validation/guard errors render inline in the form — YOURLS notices
+        // (admin_notices hook) fire before the plugin page body, so a notice
+        // registered during this POST would never display.
         $target = Rbac::get_user_by_id($id);
         $is_self = $target && defined('YOURLS_USER') && $target->username === YOURLS_USER;
         if ($is_self && $active === 0) {
-            yourls_add_notice(yourls__('You cannot deactivate your own account.'));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
-            exit();
+            $form_error = yourls__('You cannot deactivate your own account.');
+            $action = '';
+            goto rbac_render_users;
         }
 
         $current_roles = Rbac::get_user_roles($id);
@@ -58,9 +62,10 @@ if (isset($_POST['save_user'])) {
 
         $loses_admin = in_array('admin', $current_slugs, true) && !in_array('admin', $new_slugs, true);
         if ($loses_admin && Rbac::count_active_users_with_role('admin') <= 1) {
-            yourls_add_notice(yourls__('Cannot remove the administrator role from the last active administrator.'));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
-            exit();
+            $form_error = yourls__('Cannot remove the administrator role from the last active administrator.');
+            $action = '';
+            $user_password = '';
+            goto rbac_render_users;
         }
 
         $update_data = [
@@ -74,9 +79,9 @@ if (isset($_POST['save_user'])) {
         try {
             Rbac::update_user($id, $update_data);
         } catch (\InvalidArgumentException | \RuntimeException $e) {
-            yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
-            exit();
+            $form_error = yourls__('Error: ' . $e->getMessage());
+            $action = '';
+            goto rbac_render_users;
         }
 
         // Sync roles
@@ -90,33 +95,37 @@ if (isset($_POST['save_user'])) {
                 try {
                     Rbac::remove_role_from_user($id, $current_id);
                 } catch (\RuntimeException $e) {
-                    yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
-                    yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
-                    exit();
+                    $form_error = yourls__('Error: ' . $e->getMessage());
+                    $action = '';
+                    goto rbac_render_users;
                 }
             }
         }
 
         yourls_add_notice(yourls__('User updated.'));
+        yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302); // PRG on success
+        exit();
     } else {
         if (empty($password)) {
-            yourls_add_notice(yourls__('Password is required for new users.'));
+            $form_error = yourls__('Password is required for new users.');
+            $action = '';
         } else {
             try {
                 $result = Rbac::create_user($username, $password, $email, $active, $role_ids);
                 if ($result) {
                     yourls_add_notice(yourls__('User created.'));
-                } else {
-                    yourls_add_notice(yourls__('Failed to create user. (Username may already exist.)'));
+                    yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302); // PRG on success
+                    exit();
                 }
+                $form_error = yourls__('Failed to create user. (Username may already exist.)');
             } catch (\InvalidArgumentException $e) {
-                yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
+                $form_error = yourls__('Error: ' . $e->getMessage());
             }
+            $action = ''; // error: re-render form with the notice in this request
         }
     }
 
-    yourls_redirect(yourls_admin_url('plugins.php?page=rbac_users'), 302);
-    exit();
+    rbac_render_users:
 }
 
 if ($action === 'delete' && isset($_REQUEST['id'])) {
@@ -155,6 +164,10 @@ $all_roles = Rbac::get_all_roles();
 <div class="rbac-wrap">
     <h2><?php yourls_e('RBAC Users'); ?></h2>
     <p><?php yourls_e('Users are stored in the database and authenticated via the RBAC plugin.'); ?></p>
+
+    <?php if ($form_error !== ''): ?>
+    <div class="rbac-error" role="alert"><?php echo yourls_esc_html($form_error); ?></div>
+    <?php endif; ?>
 
     <div class="rbac-card">
         <h3><?php echo $action === 'edit' ? yourls_e('Edit User') : yourls_e('Add New User'); ?></h3>

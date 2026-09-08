@@ -94,14 +94,41 @@ test('password strength meter reacts to input', async () => {
   await expect(page.locator('.rbac-meter-label')).toHaveText('too weak');
 });
 
-test('weak password rejected with error notice', async () => {
+test('theme toggle switches dark mode', async () => {
+  await gotoRbacPage(page, 'users');
+  const toggle = page.locator('button.rbac-theme-toggle');
+  await expect(toggle).toHaveCount(1);
+  // default: no explicit override attribute (follows OS)
+  await expect(page.locator('html')).not.toHaveAttribute('data-rbac-theme', 'dark');
+  await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-rbac-theme', 'dark');
+  const bg = await page.locator('.rbac-card').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).not.toBe('rgb(255, 255, 255)'); // dark card background applied
+  await toggle.click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-rbac-theme', 'dark');
+});
+
+test('matrix scrolls inside its wrapper instead of stretching the wrap', async () => {
+  await gotoRbacPage(page, 'roles');
+  const wrap = page.locator('.rbac-matrix-wrap');
+  // if the table overflows, the WRAPPER must be the scroll container —
+  // the YOURLS #wrap (950px) must not grow
+  const cardWidth = await wrap.evaluate((el) => el.closest('.rbac-card').clientWidth);
+  const wrapWidth = await wrap.evaluate((el) => el.clientWidth);
+  expect(wrapWidth).toBeLessThanOrEqual(cardWidth);
+  const pageScrolls = await wrap.evaluate((el) => el.scrollWidth > el.clientWidth);
+  const tableWider = await wrap.evaluate((el) => el.querySelector('table').offsetWidth);
+  // either it fits, or it scrolls inside
+  expect(wrapWidth + (pageScrolls ? 0 : 0)).toBeLessThanOrEqual(Math.max(cardWidth, tableWider));
+});
+
+test('weak password rejected with inline error', async () => {
   await gotoRbacPage(page, 'users');
   await page.fill('input[name="rbac_username"]', `weak_${Date.now()}`);
   await page.fill('input[name="rbac_password"]', 'short');
   await page.click('input[name="save_user"]');
-  await gotoRbacPage(page, 'users');
-  // Redirect after POST; notice displayed on the plugins page then target page
-  await expect(page.locator('body')).toContainText(/at least 8 characters|Error/i);
+  // validation errors re-render the form in the same request (no redirect)
+  await expect(page.locator('.rbac-error')).toContainText(/at least 8 characters/i);
 });
 
 test('anonymous visitor gets login screen, not RBAC pages', async ({ browser }) => {

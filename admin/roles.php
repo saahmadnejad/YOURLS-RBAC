@@ -5,6 +5,7 @@ if( !defined( 'YOURLS_ABSPATH' ) ) die();
 use YOURLS\RBAC\Rbac;
 
 $action = in_array($_GET['action'] ?? '', ['edit', 'delete', ''], true) ? ($_GET['action'] ?? '') : '';
+$form_error = '';
 $role_id = 0;
 $role_name = '';
 $role_slug = '';
@@ -35,18 +36,18 @@ if (isset($_POST['save_role'])) {
         try {
             Rbac::update_role($id, $name, $slug, $desc);
         } catch (\InvalidArgumentException | \RuntimeException $e) {
-            yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
-            exit();
+            $form_error = yourls__('Error: ' . $e->getMessage());
+            $action = '';
+            goto rbac_render_roles;
         }
     } else {
         try {
             $result = Rbac::create_role($name, $slug, $desc);
             $id = (int) $result;
         } catch (\InvalidArgumentException $e) {
-            yourls_add_notice(yourls__('Error: ' . $e->getMessage()));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
-            exit();
+            $form_error = yourls__('Error: ' . $e->getMessage());
+            $action = '';
+            goto rbac_render_roles;
         }
     }
 
@@ -71,9 +72,9 @@ if (isset($_POST['save_role'])) {
             // Administrator role always keeps all permissions.
             $permission_slugs = array_map(fn($p) => $p->slug, Rbac::get_all_permissions());
         } elseif ($my_role && !in_array('manage_roles', $permission_slugs, true)) {
-            yourls_add_notice(yourls__('You cannot remove "manage_roles" from a role assigned to you.'));
-            yourls_redirect(yourls_admin_url('plugins.php?page=rbac_roles'), 302);
-            exit();
+            $form_error = yourls__('You cannot remove "manage_roles" from a role assigned to you.');
+            $action = '';
+            goto rbac_render_roles;
         }
 
         $perms = Rbac::get_all_permissions();
@@ -135,12 +136,17 @@ if ($action === 'delete' && isset($_REQUEST['id'])) {
     exit();
 }
 
+rbac_render_roles:
 $roles = Rbac::get_all_roles();
 $all_perms = Rbac::get_all_permissions();
 ?>
 
 <div class="rbac-wrap">
     <h2><?php yourls_e('RBAC Roles'); ?></h2>
+
+    <?php if ($form_error !== ''): ?>
+    <div class="rbac-error" role="alert"><?php echo yourls_esc_html($form_error); ?></div>
+    <?php endif; ?>
     <p><?php yourls_e('Roles group permissions together. Users are assigned roles to inherit their permissions.'); ?></p>
 
     <div class="rbac-card">
@@ -209,8 +215,8 @@ $all_perms = Rbac::get_all_permissions();
         <?php if (empty($roles) || empty($all_perms)): ?>
             <p><?php yourls_e('No roles or permissions defined.'); ?></p>
         <?php else: ?>
-            <div class="rbac-matrix-wrap">
-                <table class="rbac-matrix" id="rbac-matrix">
+            <div class="rbac-matrix-wrap" id="rbac-matrix">
+                <table class="rbac-matrix">
                     <thead>
                         <tr>
                             <th><?php yourls_e('Role'); ?></th>
