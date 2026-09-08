@@ -152,117 +152,121 @@ $users = Rbac::get_all_users();
 $all_roles = Rbac::get_all_roles();
 ?>
 
-<h2><?php yourls_e('RBAC Users'); ?></h2>
-<p><?php yourls_e('Users are stored in the database and authenticated via the RBAC plugin.'); ?></p>
+<div class="rbac-wrap">
+    <h2><?php yourls_e('RBAC Users'); ?></h2>
+    <p><?php yourls_e('Users are stored in the database and authenticated via the RBAC plugin.'); ?></p>
 
-<h3><?php echo $action === 'edit' ? yourls_e('Edit User') : yourls_e('Add New User'); ?></h3>
-
-<form method="post" action="">
-    <?php yourls_nonce_field('rbac_save_user'); ?>
-    <table class="tblSorter" cellpadding="0" cellspacing="1">
-        <tbody>
-            <tr>
-                <th><?php yourls_e('Username'); ?></th>
-                <td><input type="text" name="rbac_username" class="text" size="40" value="<?php echo yourls_esc_attr($user_username); ?>" required /></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Password'); ?></th>
-                <td>
-                    <input type="password" name="rbac_password" class="text" size="40" autocomplete="new-password" />
-                    <?php if ($action === 'edit'): ?>
-                        <br/><small><?php yourls_e('Leave blank to keep current password.'); ?></small>
-                    <?php endif; ?>
-                </td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Email'); ?></th>
-                <td><input type="email" name="rbac_email" class="text" size="60" value="<?php echo yourls_esc_attr($user_email); ?>" /></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Active'); ?></th>
-                <td>
-                    <label><input type="radio" name="rbac_active" value="1" <?php echo $user_active == 1 ? 'checked="checked"' : ''; ?> /> <?php yourls_e('Yes'); ?></label>
-                    <label><input type="radio" name="rbac_active" value="0" <?php echo $user_active == 0 ? 'checked="checked"' : ''; ?> /> <?php yourls_e('No'); ?></label>
-                </td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Roles'); ?></th>
-                <td>
-                    <?php if (empty($all_roles)): ?>
-                        <p><?php yourls_e('No roles defined yet.'); ?></p>
-                    <?php else: ?>
-                        <?php
-                        $assigned_role_ids = [];
-                        if ($action === 'edit' && $user_id > 0) {
-                            $assigned_roles = Rbac::get_user_roles($user_id);
-                            foreach ($assigned_roles as $ar) {
-                                $assigned_role_ids[] = $ar->id;
-                            }
+    <div class="rbac-card">
+        <h3><?php echo $action === 'edit' ? yourls_e('Edit User') : yourls_e('Add New User'); ?></h3>
+        <form method="post" action="" class="rbac-form">
+            <?php yourls_nonce_field('rbac_save_user'); ?>
+            <label for="rbac-username"><?php yourls_e('Username'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="rbac-username" name="rbac_username" value="<?php echo yourls_esc_attr($user_username); ?>" required />
+            </div>
+            <label for="rbac-password"><?php yourls_e('Password'); ?></label>
+            <div class="rbac-field">
+                <input type="password" id="rbac-password" name="rbac_password" autocomplete="new-password" data-rbac-keep="<?php echo $action === 'edit' ? '1' : '0'; ?>" />
+                <?php if ($action === 'edit'): ?>
+                    <span class="rbac-hint" style="margin-top:2px;"><?php yourls_e('Leave blank to keep current password.'); ?></span>
+                <?php else: ?>
+                    <span class="rbac-meter"><span></span></span><span class="rbac-meter-label"></span>
+                <?php endif; ?>
+            </div>
+            <label for="rbac-email"><?php yourls_e('Email'); ?></label>
+            <div class="rbac-field">
+                <input type="email" id="rbac-email" name="rbac_email" value="<?php echo yourls_esc_attr($user_email); ?>" />
+            </div>
+            <span class="rbac-field-label"><?php yourls_e('Active'); ?></span>
+            <div class="rbac-field">
+                <?php // hidden 0 + checkbox 1: unchecked still posts 0 ?>
+                <input type="hidden" name="rbac_active" value="0" />
+                <label class="rbac-toggle">
+                    <input type="checkbox" name="rbac_active" value="1" <?php echo $user_active == 1 ? 'checked="checked"' : ''; ?> />
+                    <span class="rbac-track"></span>
+                    <span class="rbac-toggle-label"><?php yourls_e('Active'); ?></span>
+                </label>
+            </div>
+            <span class="rbac-field-label"><?php yourls_e('Roles'); ?></span>
+            <div class="rbac-field">
+                <?php if (empty($all_roles)): ?>
+                    <p><?php yourls_e('No roles defined yet.'); ?></p>
+                <?php else: ?>
+                    <?php
+                    $assigned_role_ids = [];
+                    if ($action === 'edit' && $user_id > 0) {
+                        $assigned_roles = Rbac::get_user_roles($user_id);
+                        foreach ($assigned_roles as $ar) {
+                            $assigned_role_ids[] = $ar->id;
                         }
-                        ?>
-                        <?php foreach ($all_roles as $r): ?>
-                            <label style="display:inline-block;margin-right:10px;">
-                                <input type="checkbox" name="rbac_role_ids[]" value="<?php echo $r->id; ?>" <?php echo in_array($r->id, $assigned_role_ids) ? 'checked="checked"' : ''; ?> />
-                                <?php echo yourls_esc_html($r->name); ?> <small>(<?php echo yourls_esc_html($r->slug); ?>)</small>
-                            </label>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </td>
-            </tr>
-            <tr>
-                <th>&nbsp;</th>
-                <td>
-                    <input type="hidden" name="rbac_user_id" value="<?php echo $user_id; ?>" />
-                    <input type="submit" name="save_user" value="<?php yourls_e('Save User'); ?>" class="button primary" />
-                    <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_users'); ?>'" />
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</form>
+                    }
+                    ?>
+                    <?php foreach ($all_roles as $r): ?>
+                        <label style="display:inline-block;margin-right:10px;">
+                            <input type="checkbox" name="rbac_role_ids[]" value="<?php echo $r->id; ?>" <?php echo in_array($r->id, $assigned_role_ids) ? 'checked="checked"' : ''; ?> />
+                            <?php echo yourls_esc_html($r->name); ?> <small>(<?php echo yourls_esc_html($r->slug); ?>)</small>
+                        </label>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <span></span>
+            <div class="rbac-field">
+                <input type="hidden" name="rbac_user_id" value="<?php echo $user_id; ?>" />
+                <input type="submit" name="save_user" value="<?php yourls_e('Save User'); ?>" class="button primary" />
+                <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_users'); ?>'" />
+            </div>
+        </form>
+    </div>
 
-<h3><?php yourls_e('Existing Users'); ?></h3>
+    <div class="rbac-card">
+        <div class="rbac-toolbar">
+            <h3 style="border:none;margin:0;"><?php yourls_e('Existing Users'); ?></h3>
+            <input type="search" class="rbac-search" placeholder="<?php yourls_e('Search users…'); ?>" data-rbac-target="#rbac-user-list" />
+        </div>
+        <?php if (empty($users)): ?>
+            <p><?php yourls_e('No users defined.'); ?></p>
+        <?php else: ?>
+            <div class="rbac-list" id="rbac-user-list">
+                <?php foreach ($users as $u): ?>
+                    <?php
+                    $user_roles = Rbac::get_user_roles($u->id);
+                    $role_names = [];
+                    foreach ($user_roles as $ur) {
+                        $role_names[] = yourls_esc_html($ur->slug);
+                    }
+                    ?>
+                    <div class="rbac-item">
+                        <div class="rbac-item-main">
+                            <span class="rbac-item-title"><?php echo yourls_esc_html($u->username); ?></span>
+                            <span class="rbac-item-meta"><?php echo yourls_esc_html($u->email ?? ''); ?></span>
+                            <?php foreach ($role_names as $rn): ?>
+                                <span class="rbac-badge"><?php echo $rn; ?></span>
+                            <?php endforeach; ?>
+                            <?php if (!$u->active): ?>
+                                <span class="rbac-badge rbac-badge-off"><?php yourls_e('inactive'); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="rbac-item-actions">
+                            <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_users&action=edit&id=' . $u->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
+                            <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_users&action=delete&id=' . $u->id)); ?>" data-rbac-confirm="<?php yourls_e('Delete this user? This cannot be undone.'); ?>">
+                                <?php yourls_nonce_field('rbac_delete_user'); ?>
+                                <input type="hidden" name="id" value="<?php echo (int) $u->id; ?>" />
+                                <input type="hidden" name="action" value="delete" />
+                                <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
+                            </form>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
 
-<?php if (empty($users)): ?>
-<p><?php yourls_e('No users defined.'); ?></p>
-<?php else: ?>
-<table class="tblSorter" cellpadding="0" cellspacing="1">
-    <thead>
-        <tr>
-            <th><?php yourls_e('Username'); ?></th>
-            <th><?php yourls_e('Email'); ?></th>
-            <th><?php yourls_e('Active'); ?></th>
-            <th><?php yourls_e('Roles'); ?></th>
-            <th><?php yourls_e('Actions'); ?></th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($users as $u): ?>
-        <tr>
-            <td><?php echo yourls_esc_html($u->username); ?></td>
-            <td><?php echo yourls_esc_html($u->email ?? ''); ?></td>
-            <td><?php echo $u->active ? yourls_e('Yes') : yourls_e('No'); ?></td>
-            <td>
-                <?php
-                $user_roles = Rbac::get_user_roles($u->id);
-                $role_names = [];
-                foreach ($user_roles as $ur) {
-                    $role_names[] = yourls_esc_html($ur->slug);
-                }
-                echo implode(', ', $role_names);
-                ?>
-            </td>
-            <td>
-                <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_users&action=edit&id=' . $u->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
-                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_users&action=delete&id=' . $u->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
-                    <?php yourls_nonce_field('rbac_delete_user'); ?>
-                    <input type="hidden" name="id" value="<?php echo (int) $u->id; ?>" />
-                    <input type="hidden" name="action" value="delete" />
-                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
-                </form>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    </tbody>
-</table>
-<?php endif; ?>
+<dialog id="rbac-confirm-dialog">
+    <div class="rbac-confirm-title"><?php yourls_e('Confirm'); ?></div>
+    <div class="rbac-confirm-message"></div>
+    <div class="rbac-confirm-actions">
+        <button type="button" class="button rbac-confirm-no"><?php yourls_e('Cancel'); ?></button>
+        <button type="button" class="button primary rbac-confirm-yes"><?php yourls_e('Delete'); ?></button>
+    </div>
+</dialog>

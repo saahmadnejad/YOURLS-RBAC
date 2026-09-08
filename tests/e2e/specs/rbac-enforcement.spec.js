@@ -21,7 +21,7 @@ test.describe.serial('permission enforcement', () => {
     await userRoleBox.check();
     await page.click('input[name="save_user"]');
     await gotoRbacPage(page, 'users');
-    await expect(page.locator('tr', { hasText: username })).toHaveCount(1);
+    await expect(page.locator('.rbac-item', { hasText: username })).toHaveCount(1);
   });
 
   test.afterAll(async () => {
@@ -57,9 +57,11 @@ test.describe.serial('permission enforcement', () => {
     await logout(page);
     await login(page); // seeded admin
     await gotoRbacPage(page, 'roles');
-    // Protected role: no Delete button rendered at all (admin/roles.php:232)
-    const adminRow = page.locator('tr', { has: page.locator('td:text-is("Administrator")') });
+    // Protected role: no Delete button rendered at all
+    const adminRow = page.locator('table.rbac-matrix tbody tr.is-protected', { hasText: '(admin)' });
+    await expect(adminRow).toHaveCount(1);
     await expect(adminRow.locator('input[value="Delete"]')).toHaveCount(0);
-    await expect(adminRow).toContainText('manage_tools'); // keeps all perms
+    // and the admin-role row keeps every permission ticked
+    await expect(adminRow.locator('input:not(:checked)')).toHaveCount(0);
   });
 });
