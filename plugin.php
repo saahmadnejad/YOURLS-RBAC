@@ -209,16 +209,21 @@ function yourls_rbac_admin_menu() {
 yourls_add_action('admin_menu', 'yourls_rbac_admin_menu');
 
 /**
- * Load tablesorter CSS/JS for RBAC admin pages.
+ * Load the RBAC UI layer for RBAC admin pages.
+ * Note: YOURLS's 'html_head' action passes its context wrapped in an array,
+ * so use yourls_get_html_context() instead of the callback argument.
  */
-function yourls_rbac_html_head($context) {
+function yourls_rbac_html_head() {
+    $context = function_exists('yourls_get_html_context') ? yourls_get_html_context() : '';
     if (!is_string($context)) {
         return;
     }
     if (strpos($context, 'plugin_page_rbac_') === 0) {
-        echo '<link rel="stylesheet" href="' . yourls_site_url() . '/css/tablesorter.css?v=' . YOURLS_VERSION . '" type="text/css" media="screen" />';
-        echo '<script src="' . yourls_site_url() . '/js/jquery-3.tablesorter.min.js?v=' . YOURLS_VERSION . '"></script>';
-        echo '<script src="' . yourls_site_url() . '/js/tablesorte.js?v=' . YOURLS_VERSION . '"></script>';
+        // RBAC UI layer: plugin-local, cache-busted by file mtime
+        $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.css');
+        echo '<link rel="stylesheet" href="' . yourls_esc_url(yourls_site_url() . '/user/plugins/rbac/admin/rbac-ui.css?v=' . $v) . '" type="text/css" media="screen" />';
+        $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.js');
+        echo '<script src="' . yourls_esc_url(yourls_site_url() . '/user/plugins/rbac/admin/rbac-ui.js?v=' . $v) . '"></script>';
     }
 }
 yourls_add_action('html_head', 'yourls_rbac_html_head');

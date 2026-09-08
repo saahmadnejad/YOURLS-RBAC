@@ -38,6 +38,10 @@ No typecheck/lint toolchain beyond `php -l`. Verify changes with phpunit.
 
 ## Non-obvious gotchas
 
+- **`html_head` action context is an ARRAY, not a string.** YOURLS wraps
+  the context (`yourls_do_action('html_head', $context)` builds `$args[]`),
+  so a `yourls_rbac_html_head(string $context)` callback silently no-ops.
+  Use `yourls_get_html_context()` inside the callback.
 - **Form field names must be `rbac_`-prefixed.** YOURLS inspects
   `$_REQUEST['username']` / `$_REQUEST['password']` on every POST; using
   those names triggers the login nonce check → 403.
@@ -53,7 +57,8 @@ No typecheck/lint toolchain beyond `php -l`. Verify changes with phpunit.
   only if `YOURLS_RBAC_DROP_DATA` is defined in config.
 - **Docker PHP is 8.4, local dev 8.1+** — code must run on both.
 - Docker mounts plugin source read-only; code changes apply without rebuild,
-  but `composer` deps inside the image need `--build`.
+  but editing a FILE bind (plugin.php, uninstall.php) swaps its inode — run
+  `docker compose restart app` or the container keeps serving the old file.
 
 ## Security invariants (never regress)
 

@@ -139,107 +139,136 @@ $roles = Rbac::get_all_roles();
 $all_perms = Rbac::get_all_permissions();
 ?>
 
-<h2><?php yourls_e('RBAC Roles'); ?></h2>
-<p><?php yourls_e('Roles group permissions together. Users are assigned roles to inherit their permissions.'); ?></p>
+<div class="rbac-wrap">
+    <h2><?php yourls_e('RBAC Roles'); ?></h2>
+    <p><?php yourls_e('Roles group permissions together. Users are assigned roles to inherit their permissions.'); ?></p>
 
-<?php
-// Build the permission list for the form
-$selected_perms = [];
-if ($role_id > 0) {
-    $role_perms = Rbac::get_role_permissions($role_id);
-    foreach ($role_perms as $rp) {
-        $selected_perms[$rp->slug] = true;
-    }
-}
-?>
-
-<h3><?php echo $action === 'edit' ? yourls_e('Edit Role') : yourls_e('Add New Role'); ?></h3>
-
-<form method="post" action="">
-    <?php yourls_nonce_field('rbac_save_role'); ?>
-    <table class="tblSorter" cellpadding="0" cellspacing="1">
-        <tbody>
-            <tr>
-                <th><?php yourls_e('Name'); ?></th>
-                <td><input type="text" name="role_name" class="text" size="40" value="<?php echo yourls_esc_attr($role_name); ?>" required /></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Slug'); ?></th>
-                <td><input type="text" name="role_slug" class="text" size="40" value="<?php echo yourls_esc_attr($role_slug); ?>" required /><br/><small><?php yourls_e('Lowercase, letters, numbers, underscores'); ?></small></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Description'); ?></th>
-                <td><input type="text" name="role_desc" class="text" size="60" value="<?php echo yourls_esc_attr($role_desc); ?>" /></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Permissions'); ?></th>
-                <td>
-                    <?php if (empty($all_perms)): ?>
-                        <p><?php yourls_e('No permissions defined yet.'); ?></p>
-                    <?php else: ?>
-                        <?php foreach ($all_perms as $p): ?>
-                            <label style="display:inline-block;margin-right:10px;">
-                                <input type="checkbox" name="permission_slugs[]" value="<?php echo yourls_esc_attr($p->slug); ?>" <?php echo in_array($p->slug, array_keys($selected_perms)) ? 'checked="checked"' : ''; ?> />
-                                <?php echo yourls_esc_html($p->name); ?> <small>(<?php echo yourls_esc_html($p->slug); ?>)</small>
-                            </label>
-                        <?php endforeach; ?>
+    <div class="rbac-card">
+        <h3><?php echo $action === 'edit' ? yourls_e('Edit Role') : yourls_e('Add New Role'); ?></h3>
+        <form method="post" action="" class="rbac-form">
+            <?php yourls_nonce_field('rbac_save_role'); ?>
+            <label for="role-name"><?php yourls_e('Name'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="role-name" name="role_name" value="<?php echo yourls_esc_attr($role_name); ?>" required />
+            </div>
+            <label for="role-slug"><?php yourls_e('Slug'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="role-slug" name="role_slug" value="<?php echo yourls_esc_attr($role_slug); ?>" required data-rbac-slug="1" />
+                <span class="rbac-hint rbac-slug-hint" style="display:none;color:#e74c3c;"><?php yourls_e('Lowercase letters, numbers and underscores only.'); ?></span>
+            </div>
+            <label for="role-desc"><?php yourls_e('Description'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="role-desc" name="role_desc" value="<?php echo yourls_esc_attr($role_desc); ?>" />
+            </div>
+            <span class="rbac-field-label"><?php yourls_e('Permissions'); ?></span>
+            <div class="rbac-field">
+                <?php if (empty($all_perms)): ?>
+                    <p><?php yourls_e('No permissions defined yet.'); ?></p>
+                <?php else: ?>
+                    <?php
+                    $selected_perms = [];
+                    if ($role_id > 0) {
+                        $role_perms = Rbac::get_role_permissions($role_id);
+                        foreach ($role_perms as $rp) {
+                            $selected_perms[$rp->slug] = true;
+                        }
+                    }
+                    $is_admin_role = false;
+                    if ($role_id > 0) {
+                        $edited_role = Rbac::get_role_by_id($role_id);
+                        $is_admin_role = $edited_role && $edited_role->slug === 'admin';
+                    }
+                    ?>
+                    <?php foreach ($all_perms as $p): ?>
+                        <label style="display:inline-block;margin-right:10px;">
+                            <input type="checkbox" name="permission_slugs[]" value="<?php echo yourls_esc_attr($p->slug); ?>"
+                                <?php echo in_array($p->slug, array_keys($selected_perms)) ? 'checked="checked"' : ''; ?>
+                                <?php echo $is_admin_role ? 'disabled="disabled" checked="checked"' : ''; ?> />
+                            <?php echo yourls_esc_html($p->name); ?> <small>(<?php echo yourls_esc_html($p->slug); ?>)</small>
+                        </label>
+                    <?php endforeach; ?>
+                    <?php if ($is_admin_role): ?>
+                        <p class="rbac-hint"><?php yourls_e('The administrator role always keeps every permission.'); ?></p>
                     <?php endif; ?>
-                </td>
-            </tr>
-            <tr>
-                <th>&nbsp;</th>
-                <td>
-                    <input type="hidden" name="role_id" value="<?php echo $role_id; ?>" />
-                    <input type="submit" name="save_role" value="<?php yourls_e('Save Role'); ?>" class="button primary" />
-                    <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_roles'); ?>'" />
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</form>
-
-<h3><?php yourls_e('Existing Roles'); ?></h3>
-
-<?php if (empty($roles)): ?>
-<p><?php yourls_e('No roles defined.'); ?></p>
-<?php else: ?>
-<table class="tblSorter" cellpadding="0" cellspacing="1">
-    <thead>
-        <tr>
-            <th><?php yourls_e('Name'); ?></th>
-            <th><?php yourls_e('Slug'); ?></th>
-            <th><?php yourls_e('Permissions'); ?></th>
-            <th><?php yourls_e('Actions'); ?></th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($roles as $r): ?>
-        <tr>
-            <td><?php echo yourls_esc_html($r->name); ?></td>
-            <td><?php echo yourls_esc_html($r->slug); ?></td>
-            <td>
-                <?php
-                $role_perms = Rbac::get_role_permissions($r->id);
-                $perm_names = [];
-                foreach ($role_perms as $rp) {
-                    $perm_names[] = yourls_esc_html($rp->slug);
-                }
-                echo implode(', ', $perm_names);
-                ?>
-            </td>
-            <td>
-                <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_roles&action=edit&id=' . $r->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
-                <?php if ($r->slug !== 'admin'): ?>
-                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_roles&action=delete&id=' . $r->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
-                    <?php yourls_nonce_field('rbac_delete_role'); ?>
-                    <input type="hidden" name="id" value="<?php echo (int) $r->id; ?>" />
-                    <input type="hidden" name="action" value="delete" />
-                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
-                </form>
                 <?php endif; ?>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    </tbody>
-</table>
-<?php endif; ?>
+            </div>
+            <span></span>
+            <div class="rbac-field">
+                <input type="hidden" name="role_id" value="<?php echo $role_id; ?>" />
+                <input type="submit" name="save_role" value="<?php yourls_e('Save Role'); ?>" class="button primary" />
+                <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_roles'); ?>'" />
+            </div>
+        </form>
+    </div>
+
+    <div class="rbac-card">
+        <div class="rbac-toolbar">
+            <h3 style="border:none;margin:0;"><?php yourls_e('Permission Matrix'); ?></h3>
+            <input type="search" class="rbac-search" placeholder="<?php yourls_e('Search roles or permissions…'); ?>" data-rbac-target="#rbac-matrix" />
+        </div>
+        <?php if (empty($roles) || empty($all_perms)): ?>
+            <p><?php yourls_e('No roles or permissions defined.'); ?></p>
+        <?php else: ?>
+            <div class="rbac-matrix-wrap">
+                <table class="rbac-matrix" id="rbac-matrix">
+                    <thead>
+                        <tr>
+                            <th><?php yourls_e('Role'); ?></th>
+                            <?php foreach ($all_perms as $p): ?>
+                                <th title="<?php echo yourls_esc_attr($p->description ?? $p->name); ?>"><?php echo yourls_esc_html($p->slug); ?></th>
+                            <?php endforeach; ?>
+                            <th><?php yourls_e('Actions'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($roles as $r): ?>
+                            <?php
+                            $role_perms = Rbac::get_role_permissions($r->id);
+                            $perm_slugs = [];
+                            foreach ($role_perms as $rp) {
+                                $perm_slugs[$rp->slug] = true;
+                            }
+                            $protected = in_array($r->slug, Rbac::PROTECTED_ROLE_SLUGS, true);
+                            ?>
+                            <tr class="<?php echo $protected ? 'is-protected' : ''; ?>">
+                                <th>
+                                    <?php echo yourls_esc_html($r->name); ?>
+                                    <small>(<?php echo yourls_esc_html($r->slug); ?>)</small>
+                                </th>
+                                <?php foreach ($all_perms as $p): ?>
+                                    <td>
+                                        <?php if ($protected): ?>
+                                            <input type="checkbox" checked="checked" disabled="disabled" aria-label="<?php echo yourls_esc_attr($r->slug . ' / ' . $p->slug); ?>" />
+                                        <?php else: ?>
+                                            <input type="checkbox" disabled="disabled" aria-label="<?php echo yourls_esc_attr($r->slug . ' / ' . $p->slug); ?>" <?php echo isset($perm_slugs[$p->slug]) ? 'checked="checked"' : ''; ?> />
+                                        <?php endif; ?>
+                                    </td>
+                                <?php endforeach; ?>
+                                <td>
+                                    <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_roles&action=edit&id=' . $r->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
+                                    <?php if (!$protected): ?>
+                                        <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_roles&action=delete&id=' . $r->id)); ?>" style="display:inline;" data-rbac-confirm="<?php yourls_e('Delete this role? Users holding it lose its permissions.'); ?>">
+                                            <?php yourls_nonce_field('rbac_delete_role'); ?>
+                                            <input type="hidden" name="id" value="<?php echo (int) $r->id; ?>" />
+                                            <input type="hidden" name="action" value="delete" />
+                                            <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<dialog id="rbac-confirm-dialog">
+    <div class="rbac-confirm-title"><?php yourls_e('Confirm'); ?></div>
+    <div class="rbac-confirm-message"></div>
+    <div class="rbac-confirm-actions">
+        <button type="button" class="button rbac-confirm-no"><?php yourls_e('Cancel'); ?></button>
+        <button type="button" class="button primary rbac-confirm-yes"><?php yourls_e('Delete'); ?></button>
+    </div>
+</dialog>

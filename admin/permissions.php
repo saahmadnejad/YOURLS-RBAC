@@ -4,7 +4,6 @@ if( !defined( 'YOURLS_ABSPATH' ) ) die();
 
 use YOURLS\RBAC\Rbac;
 
-// Handle form submissions
 $action = in_array($_GET['action'] ?? '', ['edit', 'delete', ''], true) ? ($_GET['action'] ?? '') : '';
 $perm_id = 0;
 $perm_name = '';
@@ -50,6 +49,7 @@ if (isset($_POST['save_permission'])) {
             exit();
         }
     }
+
     yourls_add_notice($msg);
     yourls_redirect(yourls_admin_url('plugins.php?page=rbac_permissions'), 302);
     exit();
@@ -82,76 +82,78 @@ if ($action === 'delete' && isset($_REQUEST['id'])) {
 $permissions = Rbac::get_all_permissions();
 ?>
 
-<h2><?php yourls_e('RBAC Permissions'); ?></h2>
-<p><?php yourls_e('Permissions define granular capabilities. Assign them to roles to control what users can do.'); ?></p>
+<div class="rbac-wrap">
+    <h2><?php yourls_e('RBAC Permissions'); ?></h2>
+    <p><?php yourls_e('Permissions define granular capabilities. Assign them to roles to control what users can do.'); ?></p>
 
-<?php if ($action === 'edit'): ?>
-<h3><?php yourls_e('Edit Permission'); ?></h3>
-<?php else: ?>
-<h3><?php yourls_e('Add New Permission'); ?></h3>
-<?php endif; ?>
+    <div class="rbac-card">
+        <h3><?php echo $action === 'edit' ? yourls_e('Edit Permission') : yourls_e('Add New Permission'); ?></h3>
+        <form method="post" action="" class="rbac-form">
+            <?php yourls_nonce_field('rbac_save_permission'); ?>
+            <label for="perm-name"><?php yourls_e('Name'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="perm-name" name="perm_name" value="<?php echo yourls_esc_attr($perm_name); ?>" required />
+            </div>
+            <label for="perm-slug"><?php yourls_e('Slug'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="perm-slug" name="perm_slug" value="<?php echo yourls_esc_attr($perm_slug); ?>" required data-rbac-slug="1" />
+                <span class="rbac-hint rbac-slug-hint" style="display:none;color:#e74c3c;"><?php yourls_e('Lowercase letters, numbers and underscores only.'); ?></span>
+            </div>
+            <label for="perm-desc"><?php yourls_e('Description'); ?></label>
+            <div class="rbac-field">
+                <input type="text" id="perm-desc" name="perm_desc" value="<?php echo yourls_esc_attr($perm_desc); ?>" />
+            </div>
+            <span></span>
+            <div class="rbac-field">
+                <input type="hidden" name="perm_id" value="<?php echo $perm_id; ?>" />
+                <input type="submit" name="save_permission" value="<?php yourls_e('Save Permission'); ?>" class="button primary" />
+                <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_permissions'); ?>'" />
+            </div>
+        </form>
+    </div>
 
-<form method="post" action="">
-    <?php yourls_nonce_field('rbac_save_permission'); ?>
-    <table class="tblSorter" cellpadding="0" cellspacing="1">
-        <tbody>
-            <tr>
-                <th><?php yourls_e('Name'); ?></th>
-                <td><input type="text" name="perm_name" class="text" size="40" value="<?php echo yourls_esc_attr($perm_name); ?>" required /></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Slug'); ?></th>
-                <td><input type="text" name="perm_slug" class="text" size="40" value="<?php echo yourls_esc_attr($perm_slug); ?>" required /><br/><small><?php yourls_e('Lowercase, letters, numbers, underscores'); ?></small></td>
-            </tr>
-            <tr>
-                <th><?php yourls_e('Description'); ?></th>
-                <td><input type="text" name="perm_desc" class="text" size="60" value="<?php echo yourls_esc_attr($perm_desc); ?>" /></td>
-            </tr>
-            <tr>
-                <th>&nbsp;</th>
-                <td>
-                    <input type="hidden" name="perm_id" value="<?php echo $perm_id; ?>" />
-                    <input type="submit" name="save_permission" value="<?php yourls_e('Save Permission'); ?>" class="button primary" />
-                    <input type="button" value="<?php yourls_e('Cancel'); ?>" class="button" onclick="window.location.href='<?php echo yourls_admin_url('plugins.php?page=rbac_permissions'); ?>'" />
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</form>
+    <div class="rbac-card">
+        <div class="rbac-toolbar">
+            <h3 style="border:none;margin:0;"><?php yourls_e('Existing Permissions'); ?></h3>
+            <input type="search" class="rbac-search" placeholder="<?php yourls_e('Search permissions…'); ?>" data-rbac-target="#rbac-perm-list" />
+        </div>
+        <?php if (empty($permissions)): ?>
+            <p><?php yourls_e('No permissions defined.'); ?></p>
+        <?php else: ?>
+            <div class="rbac-list" id="rbac-perm-list">
+                <?php foreach ($permissions as $p): ?>
+                    <div class="rbac-item">
+                        <div class="rbac-item-main">
+                            <span class="rbac-item-title"><?php echo yourls_esc_html($p->name); ?></span>
+                            <span class="rbac-badge"><?php echo yourls_esc_html($p->slug); ?></span>
+                            <?php if (in_array($p->slug, Rbac::PROTECTED_PERMISSION_SLUGS, true)): ?>
+                                <span class="rbac-badge rbac-badge-off"><?php yourls_e('protected'); ?></span>
+                            <?php endif; ?>
+                            <span class="rbac-item-meta"><?php echo yourls_esc_html($p->description ?? ''); ?></span>
+                        </div>
+                        <div class="rbac-item-actions">
+                            <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_permissions&action=edit&id=' . $p->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
+                            <?php if (!in_array($p->slug, Rbac::PROTECTED_PERMISSION_SLUGS, true)): ?>
+                                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_permissions&action=delete&id=' . $p->id)); ?>" data-rbac-confirm="<?php yourls_e('Delete this permission? Roles holding it lose the capability.'); ?>">
+                                    <?php yourls_nonce_field('rbac_delete_permission'); ?>
+                                    <input type="hidden" name="id" value="<?php echo (int) $p->id; ?>" />
+                                    <input type="hidden" name="action" value="delete" />
+                                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
 
-<h3><?php yourls_e('Existing Permissions'); ?></h3>
-
-<?php if (empty($permissions)): ?>
-<p><?php yourls_e('No permissions defined.'); ?></p>
-<?php else: ?>
-<table class="tblSorter" cellpadding="0" cellspacing="1">
-    <thead>
-        <tr>
-            <th><?php yourls_e('Name'); ?></th>
-            <th><?php yourls_e('Slug'); ?></th>
-            <th><?php yourls_e('Description'); ?></th>
-            <th><?php yourls_e('Actions'); ?></th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($permissions as $p): ?>
-        <tr>
-            <td><?php echo yourls_esc_html($p->name); ?></td>
-            <td><?php echo yourls_esc_html($p->slug); ?></td>
-            <td><?php echo yourls_esc_html($p->description ?? ''); ?></td>
-            <td>
-                <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_permissions&action=edit&id=' . $p->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
-                <?php if (!in_array($p->slug, Rbac::PROTECTED_PERMISSION_SLUGS, true)): ?>
-                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_permissions&action=delete&id=' . $p->id)); ?>" style="display:inline;" onsubmit="return confirm('<?php yourls_e('Are you sure?'); ?>');">
-                    <?php yourls_nonce_field('rbac_delete_permission'); ?>
-                    <input type="hidden" name="id" value="<?php echo (int) $p->id; ?>" />
-                    <input type="hidden" name="action" value="delete" />
-                    <input type="submit" value="<?php yourls_e('Delete'); ?>" class="button" style="background:#e74c3c;color:#fff;" />
-                </form>
-                <?php endif; ?>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    </tbody>
-</table>
-<?php endif; ?>
+<dialog id="rbac-confirm-dialog">
+    <div class="rbac-confirm-title"><?php yourls_e('Confirm'); ?></div>
+    <div class="rbac-confirm-message"></div>
+    <div class="rbac-confirm-actions">
+        <button type="button" class="button rbac-confirm-no"><?php yourls_e('Cancel'); ?></button>
+        <button type="button" class="button primary rbac-confirm-yes"><?php yourls_e('Delete'); ?></button>
+    </div>
+</dialog>

@@ -1,0 +1,332 @@
+/* YOURLS-RBAC UI layer — plugin pages only.
+   Builds on YOURLS's existing theme (#2a85b3 accent, white panels, rounded
+   corners). No framework; standard CSS Grid + custom properties. */
+
+:root {
+  --rbac-accent: #2a85b3;
+  --rbac-accent-soft: #eaf4fb;
+  --rbac-border: #d8e6f0;
+  --rbac-text: #595441;
+  --rbac-muted: #8a94a0;
+  --rbac-danger: #c0392b;
+  --rbac-card-bg: #ffffff;
+  --rbac-page-bg: #f7fbfe;
+  --rbac-radius: 8px;
+}
+
+/* --- Page layout: card sections on a soft background --- */
+.rbac-wrap {
+  display: grid;
+  gap: 16px;
+  margin: 1em 0;
+}
+.rbac-card {
+  background: var(--rbac-card-bg);
+  border: 1px solid var(--rbac-border);
+  border-radius: var(--rbac-radius);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(42, 133, 179, 0.08);
+}
+.rbac-card > h3 {
+  margin: 0 0 10px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rbac-border);
+  color: var(--rbac-accent);
+}
+.rbac-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* --- Search input --- */
+input.rbac-search {
+  width: 220px;
+  padding: 5px 9px;
+  border: 1px solid var(--rbac-border);
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--rbac-page-bg);
+}
+input.rbac-search:focus {
+  outline: 2px solid var(--rbac-accent-soft);
+  border-color: var(--rbac-accent);
+}
+
+/* --- Forms: grid rows instead of the old th/td table --- */
+.rbac-form {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px 14px;
+  align-items: start;
+}
+.rbac-form label, .rbac-form .rbac-field-label {
+  font-weight: bold;
+  text-align: right;
+  padding-top: 5px;
+}
+.rbac-form input[type="text"],
+.rbac-form input[type="email"],
+.rbac-form input[type="password"] {
+  width: 100%;
+  max-width: 420px;
+  padding: 6px 8px;
+  border: 1px solid var(--rbac-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.rbac-form input:focus {
+  border-color: var(--rbac-accent);
+  outline: 2px solid var(--rbac-accent-soft);
+}
+.rbac-hint {
+  grid-column: 2;
+  color: var(--rbac-muted);
+  font-size: 11px;
+  margin-top: -6px;
+}
+
+/* --- Toggle switch (active/inactive) --- */
+.rbac-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+/* the real input overlays the whole label so clicks land on it */
+.rbac-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.rbac-toggle .rbac-track {
+  width: 36px;
+  height: 20px;
+  background: #cfd8e0;
+  border-radius: 20px;
+  position: relative;
+  transition: background 0.15s;
+  flex: none;
+  pointer-events: none;
+}
+.rbac-toggle .rbac-track::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: left 0.15s;
+}
+.rbac-toggle input:checked + .rbac-track {
+  background: var(--rbac-accent);
+}
+.rbac-toggle input:checked + .rbac-track::after {
+  left: 19px;
+}
+.rbac-toggle .rbac-toggle-label {
+  font-size: 12px;
+  color: var(--rbac-text);
+}
+
+/* --- Listing rows (cards instead of raw table rows) --- */
+.rbac-list {
+  display: grid;
+  gap: 8px;
+}
+.rbac-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--rbac-border);
+  border-radius: var(--rbac-radius);
+  padding: 8px 12px;
+  background: var(--rbac-page-bg);
+}
+.rbac-item .rbac-item-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+}
+.rbac-item .rbac-item-title {
+  font-weight: bold;
+}
+.rbac-item .rbac-item-meta {
+  color: var(--rbac-muted);
+  font-size: 11px;
+}
+.rbac-item .rbac-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.rbac-item.is-hidden {
+  display: none;
+}
+.rbac-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: var(--rbac-accent-soft);
+  color: var(--rbac-accent);
+  border: 1px solid var(--rbac-border);
+}
+.rbac-badge.rbac-badge-off {
+  background: #f4f4f4;
+  color: var(--rbac-muted);
+}
+.rbac-badge.rbac-badge-danger {
+  background: #fdf0ee;
+  color: var(--rbac-danger);
+  border-color: #f2cfc9;
+}
+
+/* --- Delete confirmation dialog --- */
+dialog#rbac-confirm-dialog {
+  border: 1px solid var(--rbac-border);
+  border-radius: var(--rbac-radius);
+  padding: 18px 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  max-width: 380px;
+}
+dialog#rbac-confirm-dialog::backdrop {
+  background: rgba(42, 133, 179, 0.25);
+}
+dialog#rbac-confirm-dialog .rbac-confirm-title {
+  font-weight: bold;
+  color: var(--rbac-danger);
+  margin-bottom: 8px;
+}
+dialog#rbac-confirm-dialog .rbac-confirm-message {
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+dialog#rbac-confirm-dialog .rbac-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* --- Password strength meter --- */
+.rbac-meter {
+  display: inline-block;
+  vertical-align: middle;
+  width: 120px;
+  height: 6px;
+  border-radius: 4px;
+  background: #e3e8ee;
+  overflow: hidden;
+  margin-left: 8px;
+}
+.rbac-meter span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+  background: var(--rbac-danger);
+  transition: width 0.2s, background 0.2s;
+}
+.rbac-meter.rbac-meter-1 span { width: 25%; background: #e74c3c; }
+.rbac-meter.rbac-meter-2 span { width: 50%; background: #f39c12; }
+.rbac-meter.rbac-meter-3 span { width: 75%; background: #2980b9; }
+.rbac-meter.rbac-meter-4 span { width: 100%; background: #27ae60; }
+.rbac-meter-label {
+  font-size: 11px;
+  color: var(--rbac-muted);
+  margin-left: 6px;
+}
+
+/* --- Permission matrix (roles x permissions) --- */
+.rbac-matrix-wrap {
+  overflow-x: auto;
+}
+table.rbac-matrix {
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 100%;
+}
+table.rbac-matrix th, table.rbac-matrix td {
+  border: 1px solid var(--rbac-border);
+  padding: 6px 10px;
+  text-align: center;
+}
+table.rbac-matrix thead th {
+  background: var(--rbac-accent-soft);
+  color: var(--rbac-accent);
+  position: sticky;
+  top: 0;
+}
+table.rbac-matrix tbody th {
+  text-align: left;
+  background: var(--rbac-page-bg);
+  font-weight: bold;
+}
+table.rbac-matrix input[type="checkbox"] {
+  accent-color: var(--rbac-accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+table.rbac-matrix tbody tr.is-protected th {
+  color: var(--rbac-muted);
+}
+table.rbac-matrix tbody tr.is-protected input[type="checkbox"] {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* --- Responsive: single column on small screens --- */
+@media (max-width: 640px) {
+  .rbac-form {
+    grid-template-columns: 1fr;
+  }
+  .rbac-form label, .rbac-form .rbac-field-label {
+    text-align: left;
+    padding-top: 0;
+  }
+  .rbac-hint {
+    grid-column: 1;
+  }
+}
+
+/* --- Dark mode: follow the OS setting, plugin pages only --- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rbac-accent: #3f9fd6;
+    --rbac-accent-soft: #1d3346;
+    --rbac-border: #31465c;
+    --rbac-text: #c9d4de;
+    --rbac-muted: #8fa3b5;
+    --rbac-danger: #e0705f;
+    --rbac-card-bg: #1b2735;
+    --rbac-page-bg: #223140;
+  }
+  .rbac-item .rbac-item-title,
+  .rbac-toggle .rbac-toggle-label,
+  .rbac-form label, .rbac-form .rbac-field-label {
+    color: var(--rbac-text);
+  }
+  .rbac-badge.rbac-badge-off {
+    background: #2c3a4a;
+  }
+  dialog#rbac-confirm-dialog {
+    color: var(--rbac-text);
+  }
+  input.rbac-search {
+    color: var(--rbac-text);
+  }
+}

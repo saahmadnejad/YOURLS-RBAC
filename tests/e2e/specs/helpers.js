@@ -42,6 +42,20 @@ export function rowByFirstCell(page, value) {
   return page.locator(`xpath=//tbody/tr[td[1][normalize-space(text())='${value}']]`);
 }
 
+// Card-row locator for the new .rbac-item list markup, scoped by its
+// .rbac-item-title exact text.
+export function itemRow(page, title) {
+  return page.locator('.rbac-item', { has: page.locator(`.rbac-item-title:text-is("${title}")`) }).first();
+}
+
+// The UI replaces window.confirm with a <dialog>; clicking Delete opens it.
+// Accept it to let the form POST through.
+export async function confirmDelete(page) {
+  const dlg = page.locator('#rbac-confirm-dialog');
+  await expect(dlg).toBeVisible();
+  await dlg.locator('.rbac-confirm-yes').click();
+}
+
 export async function logout(page) {
   // YOURLS logout is a nonce-protected GET link in the admin menu.
   // No-op when already logged out (login form showing).

@@ -1,8 +1,7 @@
 // E2E: lockout guards + inactive-user login refusal + menu visibility.
-// Review items 4, 5 and the viewer-menu minor: these are DB-touching
-// "never regress" invariants with no unit coverage.
+// These are DB-touching "never regress" invariants with no unit coverage.
 const { test, expect } = require('@playwright/test');
-const { login, gotoRbacPage, logout, rowByFirstCell } = require('./helpers');
+const { login, gotoRbacPage, logout, itemRow, confirmDelete } = require('./helpers');
 
 test.describe.serial('lockout guards', () => {
   let page;
@@ -20,7 +19,7 @@ test.describe.serial('lockout guards', () => {
     await page.locator('label', { hasText: '(admin)' }).locator('input[name="rbac_role_ids[]"]').check();
     await page.click('input[name="save_user"]');
     await gotoRbacPage(page, 'users');
-    await expect(page.locator('tr', { hasText: username })).toHaveCount(1);
+    await expect(itemRow(page, username)).toBeVisible();
   });
 
   test.afterAll(async () => {
@@ -29,66 +28,60 @@ test.describe.serial('lockout guards', () => {
 
   test('cannot delete own account', async () => {
     await gotoRbacPage(page, 'users');
-    const selfRow = rowByFirstCell(page, 'admin');
     // seeded 'admin' user = current session user
+    const selfRow = itemRow(page, 'admin');
     const del = selfRow.locator('input[value="Delete"]');
     if (await del.count()) {
-      page.once('dialog', (d) => d.accept());
       await del.click();
+      await confirmDelete(page);
       await page.waitForLoadState('networkidle');
       await gotoRbacPage(page, 'users');
-      await expect(rowByFirstCell(page, 'admin')).toHaveCount(1);
+      await expect(itemRow(page, 'admin')).toBeVisible();
     }
   });
 
   test('cannot deactivate own account', async () => {
     await gotoRbacPage(page, 'users');
-    const selfRow = rowByFirstCell(page, 'admin');
+    const selfRow = itemRow(page, 'admin');
     await selfRow.locator('a:has-text("Edit")').click();
-    await page.check('input[name="rbac_active"][value="0"]');
+    await page.uncheck('input[name="rbac_active"][value="1"]');
     await page.click('input[name="save_user"]');
     await page.waitForLoadState('networkidle');
     await gotoRbacPage(page, 'users');
-    const row = rowByFirstCell(page, 'admin');
-    await expect(row).toContainText('Yes'); // still active
+    // still active: no 'inactive' badge
+    await expect(itemRow(page, 'admin')).not.toContainText('inactive');
   });
 
   test('cannot demote the last active administrator (self)', async () => {
+    const other = username;
     // Drop the admin role from the OTHER admin first — allowed; then the
     // session user is the last active admin and removing admin must hold.
-    const other = username;
     await gotoRbacPage(page, 'users');
-    const otherRow = page.locator('tr', { hasText: other });
-    await otherRow.locator('a:has-text("Edit")').click();
+    await itemRow(page, other).locator('a:has-text("Edit")').click();
     await page.locator('label', { hasText: '(admin)' }).locator('input[name="rbac_role_ids[]"]').uncheck();
     await page.click('input[name="save_user"]');
     await page.waitForLoadState('networkidle');
     await gotoRbacPage(page, 'users');
-    await expect(page.locator('tr', { hasText: other })).not.toContainText('admin');
+    await expect(itemRow(page, other)).not.toContainText('admin');
 
     // Now demote self — server must refuse, admin row keeps admin role.
-    const selfRow = rowByFirstCell(page, 'admin');
-    await selfRow.locator('a:has-text("Edit")').click();
+    await itemRow(page, 'admin').locator('a:has-text("Edit")').click();
     await page.locator('label', { hasText: '(admin)' }).locator('input[name="rbac_role_ids[]"]').uncheck();
     await page.click('input[name="save_user"]');
     await page.waitForLoadState('networkidle');
     await gotoRbacPage(page, 'users');
-    await expect(rowByFirstCell(page, 'admin')).toContainText('admin');
+    await expect(itemRow(page, 'admin')).toContainText('admin');
 
-    // Restore other admin role for teardown symmetry
-    await page.locator('tr', { hasText: other }).locator('a:has-text("Edit")').click();
+    // Restore other admin role for the remaining tests
+    await itemRow(page, other).locator('a:has-text("Edit")').click();
     await page.locator('label', { hasText: '(admin)' }).locator('input[name="rbac_role_ids[]"]').check();
     await page.click('input[name="save_user"]');
     await page.waitForLoadState('networkidle');
 
     // Self was demoted by the blocked save? No — the block redirects before
-    // any change, but the form was submitted with no roles for SELF only if
-    // the guard failed. Guard passed: self still holds admin. However the
-    // edit form pre-dates the blocked POST; ensure self role intact for the
-    // remaining tests by re-editing self and re-checking admin.
+    // any change, but re-assert self role intact for the remaining tests.
     await gotoRbacPage(page, 'users');
-    const selfAfter = rowByFirstCell(page, 'admin');
-    await selfAfter.locator('a:has-text("Edit")').click();
+    await itemRow(page, 'admin').locator('a:has-text("Edit")').click();
     await page.locator('label', { hasText: '(admin)' }).locator('input[name="rbac_role_ids[]"]').check();
     await page.click('input[name="save_user"]');
     await page.waitForLoadState('networkidle');
@@ -97,9 +90,8 @@ test.describe.serial('lockout guards', () => {
   test('inactive user cannot log in', async () => {
     // Deactivate the second admin (allowed — not self, not last admin)
     await gotoRbacPage(page, 'users');
-    const otherRow = page.locator('tr', { hasText: username });
-    await otherRow.locator('a:has-text("Edit")').click();
-    await page.check('input[name="rbac_active"][value="0"]');
+    await itemRow(page, username).locator('a:has-text("Edit")').click();
+    await page.uncheck('input[name="rbac_active"][value="1"]');
     await page.click('input[name="save_user"]');
     await page.waitForLoadState('networkidle');
 
