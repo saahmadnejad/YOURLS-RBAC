@@ -257,10 +257,13 @@ npm test
 ```
 
 The suite covers the admin pages (users, roles, permissions), the full
-user lifecycle (create → assign role → edit → delete), the field-name
-collision regression, permission enforcement (403 for under-privileged
-users, URL-write denial), and the protected-slug guards. Tests run
-serialized against a shared DB and use system Chrome (`channel: 'chrome'`)
+user lifecycle (create → assign role → edit → delete), role and permission
+CRUD with permission-assignment sync, the field-name collision regression,
+permission enforcement (403 for under-privileged users, URL write/edit/delete
+denial), lockout guards (self-delete, self-deactivation, demote-last-admin),
+inactive-user login refusal, and the protected-slug/permission guards.
+Tests run serialized against a shared DB (reset to seed state by
+`global-setup.js` before each run) and use system Chrome (`channel: 'chrome'`)
 so no browser download is needed. Set `RBAC_E2E_BASE_URL` if the app is not
 on port 8081.
 

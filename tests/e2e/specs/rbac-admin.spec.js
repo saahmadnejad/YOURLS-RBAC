@@ -2,7 +2,7 @@
 // create → assign role → verify → edit → delete, plus regression tests for
 // the field-name collision (rbac_ prefix) and lockout guards.
 const { test, expect } = require('@playwright/test');
-const { login, gotoRbacPage } = require('./helpers');
+const { login, gotoRbacPage, rowByFirstCell } = require('./helpers');
 
 let page;
 
@@ -22,7 +22,7 @@ test('admin menu shows User Management entry', async () => {
 
 test('RBAC Users page lists seeded admin user', async () => {
   await gotoRbacPage(page, 'users');
-  await expect(page.locator('td:text-is("admin")').first()).toBeVisible();
+  await expect(rowByFirstCell(page, 'admin')).toHaveCount(1);
 });
 
 test('RBAC Roles page lists seeded roles', async () => {
@@ -45,12 +45,12 @@ test('create user with role → verify row → edit → delete', async () => {
   await page.fill('input[name="rbac_username"]', username);
   await page.fill('input[name="rbac_password"]', 'e2ePassw0rd!');
   await page.fill('input[name="rbac_email"]', `${username}@example.com`);
-  await page.check('input[name="rbac_role_ids[]"]:first-of-type'); // admin role
+  await page.locator('label', { hasText: '(user)' }).locator('input[name="rbac_role_ids[]"]').check();
   await page.click('input[name="save_user"]');
   await gotoRbacPage(page, 'users');
   const row = page.locator('tr', { hasText: username });
   await expect(row).toHaveCount(1);
-  await expect(row).toContainText('admin'); // role assigned
+  await expect(row).toContainText('user'); // role assigned
 
   // Edit: set inactive
   await row.locator('a:has-text("Edit")').click();
