@@ -219,11 +219,13 @@ function yourls_rbac_html_head() {
         return;
     }
     if (strpos($context, 'plugin_page_rbac_') === 0) {
-        // RBAC UI layer: plugin-local, cache-busted by file mtime
+        // RBAC UI layer: plugin-local, cache-busted by file mtime.
+        // yourls_site_url() echoes by default — pass false to get a string.
+        $site = yourls_site_url(false);
         $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.css');
-        echo '<link rel="stylesheet" href="' . yourls_esc_url(yourls_site_url() . '/user/plugins/rbac/admin/rbac-ui.css?v=' . $v) . '" type="text/css" media="screen" />';
+        echo '<link rel="stylesheet" href="' . yourls_esc_url($site . '/user/plugins/rbac/admin/rbac-ui.css?v=' . $v) . '" type="text/css" media="screen" />';
         $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.js');
-        echo '<script src="' . yourls_esc_url(yourls_site_url() . '/user/plugins/rbac/admin/rbac-ui.js?v=' . $v) . '"></script>';
+        echo '<script src="' . yourls_esc_url($site . '/user/plugins/rbac/admin/rbac-ui.js?v=' . $v) . '"></script>';
     }
 }
 yourls_add_action('html_head', 'yourls_rbac_html_head');

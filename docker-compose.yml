@@ -34,6 +34,9 @@ services:
       # Site
       YOURLS_SITE: http://localhost:8080
 
+      # Debug (set to 'true' to see the SQL log on admin pages)
+      YOURLS_DEBUG: ''
+
       # Admin credentials (default YOURLS login)
       YOURLS_USER: admin
       YOURLS_PASSWD: password123
