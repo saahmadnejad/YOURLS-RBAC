@@ -1,0 +1,95 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Unit tests on PHP ${{ matrix.php-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version:
+          - "8.3"
+          - "8.4"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: mbstring
+          coverage: none
+          tools: composer
+
+      - name: Validate Composer configuration
+        run: composer validate --strict
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit --testdox
+
+  e2e-tests:
+    name: Playwright E2E tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Start YOURLS
+        run: docker compose up -d --build
+
+      - name: Wait for YOURLS
+        run: |
+          for i in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:8080/ >/dev/null; then
+              echo "YOURLS is ready"
+              exit 0
+            fi
+
+            echo "Waiting for YOURLS..."
+            sleep 2
+          done
+
+          docker compose logs
+          exit 1
+
+      - name: Install E2E dependencies
+        working-directory: tests/e2e
+        run: npm install
+
+      - name: Run Playwright E2E tests
+        working-directory: tests/e2e
+        env:
+          RBAC_E2E_BASE_URL: http://127.0.0.1:8080
+        run: npm test
+
+      - name: Show Docker logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop YOURLS
+        if: always()
+        run: docker compose down -v
