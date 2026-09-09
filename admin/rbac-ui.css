@@ -11,6 +11,13 @@
   --rbac-danger: #c0392b;
   --rbac-card-bg: #ffffff;
   --rbac-page-bg: #f7fbfe;
+  --rbac-badge-off-bg: #f4f4f4;
+  --rbac-input-bg: #ffffff;
+  --rbac-error-bg: #fdf0ee;
+  --rbac-error-border: #f2cfc9;
+  --rbac-track-bg: #cfd8e0;
+  --rbac-knob-bg: #ffffff;
+  --rbac-meter-bg: #e3e8ee;
   --rbac-radius: 8px;
 }
 
@@ -48,23 +55,21 @@ input.rbac-search {
   border: 1px solid var(--rbac-border);
   border-radius: 6px;
   font-size: 12px;
-  background: var(--rbac-page-bg);
+  color: var(--rbac-text);
+  background: var(--rbac-input-bg);
 }
 input.rbac-search:focus {
-  outline: 2px solid var(--rbac-accent-soft);
+  outline: 2px solid var(--rbac-accent);
   border-color: var(--rbac-accent);
 }
 
 /* --- Inline form error (validation / guard refusals) --- */
 .rbac-error {
-  background: #fdf0ee;
-  border: 1px solid #f2cfc9;
+  background: var(--rbac-error-bg);
+  border: 1px solid var(--rbac-error-border);
   border-radius: var(--rbac-radius);
   color: var(--rbac-danger);
   padding: 10px 14px;
-}
-html[data-rbac-theme="dark"] .rbac-error {
-  background: #3a2422;
 }
 
 /* --- Forms: grid rows instead of the old th/td table --- */
@@ -78,6 +83,7 @@ html[data-rbac-theme="dark"] .rbac-error {
   font-weight: bold;
   text-align: end; /* logical: right in LTR, left in RTL */
   padding-top: 5px;
+  color: var(--rbac-text);
 }
 .rbac-form input[type="text"],
 .rbac-form input[type="email"],
@@ -88,10 +94,12 @@ html[data-rbac-theme="dark"] .rbac-error {
   border: 1px solid var(--rbac-border);
   border-radius: 6px;
   box-sizing: border-box;
+  color: var(--rbac-text);
+  background: var(--rbac-input-bg);
 }
 .rbac-form input:focus {
   border-color: var(--rbac-accent);
-  outline: 2px solid var(--rbac-accent-soft);
+  outline: 2px solid var(--rbac-accent);
 }
 .rbac-hint {
   grid-column: 2;
@@ -122,7 +130,7 @@ html[data-rbac-theme="dark"] .rbac-error {
 .rbac-toggle .rbac-track {
   width: 36px;
   height: 20px;
-  background: #cfd8e0;
+  background: var(--rbac-track-bg);
   border-radius: 20px;
   position: relative;
   transition: background 0.15s;
@@ -133,18 +141,18 @@ html[data-rbac-theme="dark"] .rbac-error {
   content: "";
   width: 14px;
   height: 14px;
-  background: #fff;
+  background: var(--rbac-knob-bg);
   border-radius: 50%;
   position: absolute;
   top: 3px;
-  left: 3px;
-  transition: left 0.15s;
+  inset-inline-start: 3px;
+  transition: inset-inline-start 0.15s;
 }
 .rbac-toggle input:checked + .rbac-track {
   background: var(--rbac-accent);
 }
 .rbac-toggle input:checked + .rbac-track::after {
-  left: 19px;
+  inset-inline-start: 19px;
 }
 .rbac-toggle .rbac-toggle-label {
   font-size: 12px;
@@ -165,6 +173,7 @@ html[data-rbac-theme="dark"] .rbac-error {
   border: 1px solid var(--rbac-border);
   border-radius: var(--rbac-radius);
   padding: 8px 12px;
+  color: var(--rbac-text);
   background: var(--rbac-page-bg);
 }
 .rbac-item .rbac-item-main {
@@ -175,6 +184,7 @@ html[data-rbac-theme="dark"] .rbac-error {
 }
 .rbac-item .rbac-item-title {
   font-weight: bold;
+  color: var(--rbac-text);
 }
 .rbac-item .rbac-item-meta {
   color: var(--rbac-muted);
@@ -202,7 +212,7 @@ table.rbac-matrix tbody tr.is-hidden {
   border: 1px solid var(--rbac-border);
 }
 .rbac-badge.rbac-badge-off {
-  background: #f4f4f4;
+  background: var(--rbac-badge-off-bg);
   color: var(--rbac-muted);
 }
 .rbac-badge.rbac-badge-danger {
@@ -244,7 +254,7 @@ dialog#rbac-confirm-dialog .rbac-confirm-actions {
   width: 120px;
   height: 6px;
   border-radius: 4px;
-  background: #e3e8ee;
+  background: var(--rbac-meter-bg);
   overflow: hidden;
   margin-inline-start: 8px;
 }
@@ -313,16 +323,13 @@ table.rbac-matrix input[type="checkbox"] {
 table.rbac-matrix tbody tr.is-protected th {
   color: var(--rbac-muted);
 }
-table.rbac-matrix tbody tr.is-protected input[type="checkbox"] {
-  pointer-events: none;
+table.rbac-matrix input[type="checkbox"][aria-disabled="true"] {
   opacity: 0.4;
+  cursor: default;
 }
 
 /* --- RTL: mirror what logical properties can't (YOURLS sets dir=rtl for
    locales like fa_IR — see yourls_is_rtl()) --- */
-[dir="rtl"] table.rbac-matrix tbody th {
-  text-align: start;
-}
 [dir="rtl"] .rbac-confirm-actions {
   /* dialog buttons: primary on the left in RTL */
   flex-direction: row-reverse;
@@ -343,8 +350,8 @@ table.rbac-matrix tbody tr.is-protected input[type="checkbox"] {
 }
 
 /* --- Theme: explicit override wins, OS setting as default --- */
-/* Dark palette, applied either when the toggle sets data-rbac-theme=dark
-   or, with no stored choice, when the OS prefers dark. */
+/* All element rules read custom properties, so dark mode is just a
+   variable override. Explicit choice lives on <html data-rbac-theme>. */
 html[data-rbac-theme="dark"] {
   --rbac-accent: #3f9fd6;
   --rbac-accent-soft: #1d3346;
@@ -354,36 +361,18 @@ html[data-rbac-theme="dark"] {
   --rbac-danger: #e0705f;
   --rbac-card-bg: #1b2735;
   --rbac-page-bg: #223140;
+  --rbac-badge-off-bg: #2c3a4a;
+  --rbac-input-bg: #223140;
+  --rbac-error-bg: #3a2422;
+  --rbac-error-border: #5c3a34;
+  --rbac-track-bg: #31465c;
+  --rbac-knob-bg: #c9d4de;
+  --rbac-meter-bg: #31465c;
 }
-html[data-rbac-theme="dark"] .rbac-item .rbac-item-title,
-html[data-rbac-theme="dark"] .rbac-toggle .rbac-toggle-label,
-html[data-rbac-theme="dark"] .rbac-form label,
-html[data-rbac-theme="dark"] .rbac-form .rbac-field-label {
-  color: var(--rbac-text);
-}
-html[data-rbac-theme="dark"] .rbac-badge.rbac-badge-off {
-  background: #2c3a4a;
-}
-html[data-rbac-theme="dark"] dialog#rbac-confirm-dialog {
-  color: var(--rbac-text);
-  background: var(--rbac-card-bg);
-}
-html[data-rbac-theme="dark"] input.rbac-search,
-html[data-rbac-theme="dark"] .rbac-form input[type="text"],
-html[data-rbac-theme="dark"] .rbac-form input[type="email"],
-html[data-rbac-theme="dark"] .rbac-form input[type="password"] {
-  color: var(--rbac-text);
-  background: var(--rbac-page-bg);
-}
-html[data-rbac-theme="dark"] .rbac-item,
-html[data-rbac-theme="dark"] table.rbac-matrix tbody th {
-  background: var(--rbac-page-bg);
-}
-html[data-rbac-theme="dark"] table.rbac-matrix thead th {
-  background: var(--rbac-accent-soft);
-}
+
+/* OS-preferred dark, unless the user explicitly chose light */
 @media (prefers-color-scheme: dark) {
-  html:not([data-rbac-theme]) {
+  html:not([data-rbac-theme="light"]) {
     --rbac-accent: #3f9fd6;
     --rbac-accent-soft: #1d3346;
     --rbac-border: #31465c;
@@ -392,33 +381,13 @@ html[data-rbac-theme="dark"] table.rbac-matrix thead th {
     --rbac-danger: #e0705f;
     --rbac-card-bg: #1b2735;
     --rbac-page-bg: #223140;
-  }
-  html:not([data-rbac-theme]) .rbac-item .rbac-item-title,
-  html:not([data-rbac-theme]) .rbac-toggle .rbac-toggle-label,
-  html:not([data-rbac-theme]) .rbac-form label,
-  html:not([data-rbac-theme]) .rbac-form .rbac-field-label {
-    color: var(--rbac-text);
-  }
-  html:not([data-rbac-theme]) .rbac-badge.rbac-badge-off {
-    background: #2c3a4a;
-  }
-  html:not([data-rbac-theme]) dialog#rbac-confirm-dialog {
-    color: var(--rbac-text);
-    background: var(--rbac-card-bg);
-  }
-  html:not([data-rbac-theme]) input.rbac-search,
-  html:not([data-rbac-theme]) .rbac-form input[type="text"],
-  html:not([data-rbac-theme]) .rbac-form input[type="email"],
-  html:not([data-rbac-theme]) .rbac-form input[type="password"] {
-    color: var(--rbac-text);
-    background: var(--rbac-page-bg);
-  }
-  html:not([data-rbac-theme]) .rbac-item,
-  html:not([data-rbac-theme]) table.rbac-matrix tbody th {
-    background: var(--rbac-page-bg);
-  }
-  html:not([data-rbac-theme]) table.rbac-matrix thead th {
-    background: var(--rbac-accent-soft);
+    --rbac-badge-off-bg: #2c3a4a;
+    --rbac-input-bg: #223140;
+    --rbac-error-bg: #3a2422;
+    --rbac-error-border: #5c3a34;
+    --rbac-track-bg: #31465c;
+    --rbac-knob-bg: #c9d4de;
+    --rbac-meter-bg: #31465c;
   }
 }
 

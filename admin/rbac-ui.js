@@ -4,6 +4,10 @@
   'use strict';
 
   function init() {
+    var t = function (key, fallback) {
+      return (window.rbacUi && window.rbacUi[key]) ? window.rbacUi[key] : fallback;
+    };
+
     // --- Theme toggle (optional dark mode; default follows the OS) ---
     // Stored choice lives on <html data-rbac-theme>; when unset, the CSS
     // media query follows prefers-color-scheme.
@@ -27,7 +31,9 @@
         var current = html.getAttribute('data-rbac-theme')
           || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         btn.textContent = current === 'dark' ? '☀' : '☾';
-        btn.title = current === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+        btn.title = current === 'dark'
+          ? t('themeLight', 'Switch to light theme')
+          : t('themeDark', 'Switch to dark theme');
       };
       btn.addEventListener('click', function () {
         var current = html.getAttribute('data-rbac-theme')
@@ -71,19 +77,24 @@
           dialog.querySelector('.rbac-confirm-message').textContent = message;
           var yes = dialog.querySelector('.rbac-confirm-yes');
           var no = dialog.querySelector('.rbac-confirm-no');
-          var cleanup = function () {
+          var onYes = function () {
+            form.dataset.rbacConfirmed = '1';
+            dialog.close(); // 'close' handler unbinds + fires submit
+          };
+          var onNo = function () { dialog.close(); };
+          // cleanup binds to 'close' so Esc (native cancel) unbinds too —
+          // otherwise stale handlers would confirm a *different* form later
+          var onClose = function () {
             yes.removeEventListener('click', onYes);
             no.removeEventListener('click', onNo);
-            dialog.close();
+            dialog.removeEventListener('close', onClose);
+            if (form.dataset.rbacConfirmed === '1') {
+              form.submit(); // bypasses this submit handler
+            }
           };
-          var onYes = function () {
-            cleanup();
-            form.dataset.rbacConfirmed = '1';
-            form.submit();
-          };
-          var onNo = function () { cleanup(); };
           yes.addEventListener('click', onYes);
           no.addEventListener('click', onNo);
+          dialog.addEventListener('close', onClose);
           dialog.showModal();
         } else {
           // fallback when the dialog markup is missing
@@ -100,6 +111,7 @@
     var meter = document.querySelector('.rbac-meter');
     var meterLabel = document.querySelector('.rbac-meter-label');
     if (pw && meter && pw.dataset.rbacKeep !== '1') {
+      var labels = t('meterLabels', ['too weak', 'weak', 'fair', 'good', 'strong']);
       pw.addEventListener('input', function () {
         var v = pw.value;
         var score = 0;
@@ -108,7 +120,6 @@
         if (/\d/.test(v)) score++;
         if (/[^A-Za-z0-9]/.test(v)) score++;
         meter.className = 'rbac-meter rbac-meter-' + score;
-        var labels = ['too weak', 'weak', 'fair', 'good', 'strong'];
         meterLabel.textContent = v ? labels[score] : '';
       });
     }

@@ -37,7 +37,6 @@ if (isset($_POST['save_role'])) {
             Rbac::update_role($id, $name, $slug, $desc);
         } catch (\InvalidArgumentException | \RuntimeException $e) {
             $form_error = yourls__('Error: ' . $e->getMessage());
-            $action = '';
             goto rbac_render_roles;
         }
     } else {
@@ -46,7 +45,6 @@ if (isset($_POST['save_role'])) {
             $id = (int) $result;
         } catch (\InvalidArgumentException $e) {
             $form_error = yourls__('Error: ' . $e->getMessage());
-            $action = '';
             goto rbac_render_roles;
         }
     }
@@ -73,7 +71,6 @@ if (isset($_POST['save_role'])) {
             $permission_slugs = array_map(fn($p) => $p->slug, Rbac::get_all_permissions());
         } elseif ($my_role && !in_array('manage_roles', $permission_slugs, true)) {
             $form_error = yourls__('You cannot remove "manage_roles" from a role assigned to you.');
-            $action = '';
             goto rbac_render_roles;
         }
 
@@ -244,16 +241,16 @@ $all_perms = Rbac::get_all_permissions();
                                 <?php foreach ($all_perms as $p): ?>
                                     <td>
                                         <?php if ($protected): ?>
-                                            <input type="checkbox" checked="checked" disabled="disabled" aria-label="<?php echo yourls_esc_attr($r->slug . ' / ' . $p->slug); ?>" />
+                                            <input type="checkbox" checked="checked" tabindex="-1" aria-disabled="true" aria-label="<?php echo yourls_esc_attr($r->slug . ' / ' . $p->slug); ?>" />
                                         <?php else: ?>
-                                            <input type="checkbox" disabled="disabled" aria-label="<?php echo yourls_esc_attr($r->slug . ' / ' . $p->slug); ?>" <?php echo isset($perm_slugs[$p->slug]) ? 'checked="checked"' : ''; ?> />
+                                            <input type="checkbox" tabindex="-1" aria-disabled="true" aria-label="<?php echo yourls_esc_attr($r->slug . ' / ' . $p->slug); ?>" <?php echo isset($perm_slugs[$p->slug]) ? 'checked="checked"' : ''; ?> />
                                         <?php endif; ?>
                                     </td>
                                 <?php endforeach; ?>
                                 <td>
                                     <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_roles&action=edit&id=' . $r->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
                                     <?php if (!$protected): ?>
-                                        <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_roles&action=delete&id=' . $r->id)); ?>" style="display:inline;" data-rbac-confirm="<?php yourls_e('Delete this role? Users holding it lose its permissions.'); ?>">
+                                        <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_roles&action=delete&id=' . $r->id)); ?>" style="display:inline;" data-rbac-confirm="<?php echo yourls_esc_attr(yourls__('Delete this role? Users holding it lose its permissions.')); ?>">
                                             <?php yourls_nonce_field('rbac_delete_role'); ?>
                                             <input type="hidden" name="id" value="<?php echo (int) $r->id; ?>" />
                                             <input type="hidden" name="action" value="delete" />

@@ -37,7 +37,6 @@ if (isset($_POST['save_permission'])) {
             $msg = $result ? yourls__('Permission updated.') : yourls__('Failed to update permission.');
         } catch (\InvalidArgumentException | \RuntimeException $e) {
             $form_error = yourls__('Error: ' . $e->getMessage());
-            $action = '';
             goto rbac_render_permissions;
         }
     } else {
@@ -46,7 +45,6 @@ if (isset($_POST['save_permission'])) {
             $msg = $result ? yourls__('Permission created.') : yourls__('Failed to create permission. (Slug may already exist.)');
         } catch (\InvalidArgumentException $e) {
             $form_error = yourls__('Error: ' . $e->getMessage());
-            $action = '';
             goto rbac_render_permissions;
         }
     }
@@ -140,7 +138,7 @@ $permissions = Rbac::get_all_permissions();
                         <div class="rbac-item-actions">
                             <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_permissions&action=edit&id=' . $p->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
                             <?php if (!in_array($p->slug, Rbac::PROTECTED_PERMISSION_SLUGS, true)): ?>
-                                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_permissions&action=delete&id=' . $p->id)); ?>" data-rbac-confirm="<?php yourls_e('Delete this permission? Roles holding it lose the capability.'); ?>">
+                                <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_permissions&action=delete&id=' . $p->id)); ?>" data-rbac-confirm="<?php echo yourls_esc_attr(yourls__('Delete this permission? Roles holding it lose the capability.')); ?>">
                                     <?php yourls_nonce_field('rbac_delete_permission'); ?>
                                     <input type="hidden" name="id" value="<?php echo (int) $p->id; ?>" />
                                     <input type="hidden" name="action" value="delete" />

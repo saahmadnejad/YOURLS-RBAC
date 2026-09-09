@@ -45,7 +45,7 @@ if (isset($_POST['save_user'])) {
         $is_self = $target && defined('YOURLS_USER') && $target->username === YOURLS_USER;
         if ($is_self && $active === 0) {
             $form_error = yourls__('You cannot deactivate your own account.');
-            $action = '';
+            // keep $action = 'edit' so the form re-renders as "Edit User"
             goto rbac_render_users;
         }
 
@@ -63,7 +63,6 @@ if (isset($_POST['save_user'])) {
         $loses_admin = in_array('admin', $current_slugs, true) && !in_array('admin', $new_slugs, true);
         if ($loses_admin && Rbac::count_active_users_with_role('admin') <= 1) {
             $form_error = yourls__('Cannot remove the administrator role from the last active administrator.');
-            $action = '';
             $user_password = '';
             goto rbac_render_users;
         }
@@ -80,7 +79,6 @@ if (isset($_POST['save_user'])) {
             Rbac::update_user($id, $update_data);
         } catch (\InvalidArgumentException | \RuntimeException $e) {
             $form_error = yourls__('Error: ' . $e->getMessage());
-            $action = '';
             goto rbac_render_users;
         }
 
@@ -96,7 +94,6 @@ if (isset($_POST['save_user'])) {
                     Rbac::remove_role_from_user($id, $current_id);
                 } catch (\RuntimeException $e) {
                     $form_error = yourls__('Error: ' . $e->getMessage());
-                    $action = '';
                     goto rbac_render_users;
                 }
             }
@@ -261,7 +258,7 @@ $all_roles = Rbac::get_all_roles();
                         </div>
                         <div class="rbac-item-actions">
                             <a href="<?php echo yourls_admin_url('plugins.php?page=rbac_users&action=edit&id=' . $u->id); ?>" class="button"><?php yourls_e('Edit'); ?></a>
-                            <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_users&action=delete&id=' . $u->id)); ?>" data-rbac-confirm="<?php yourls_e('Delete this user? This cannot be undone.'); ?>">
+                            <form method="post" action="<?php echo yourls_esc_attr(yourls_admin_url('plugins.php?page=rbac_users&action=delete&id=' . $u->id)); ?>" data-rbac-confirm="<?php echo yourls_esc_attr(yourls__('Delete this user? This cannot be undone.')); ?>">
                                 <?php yourls_nonce_field('rbac_delete_user'); ?>
                                 <input type="hidden" name="id" value="<?php echo (int) $u->id; ?>" />
                                 <input type="hidden" name="action" value="delete" />
