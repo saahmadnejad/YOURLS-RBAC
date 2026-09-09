@@ -14,6 +14,7 @@ permissions. No core YOURLS files modified — everything hooks YOURLS seams.
 | `vendor/bin/phpunit --testdox` | Run all unit tests (no YOURLS install or DB needed) |
 | `vendor/bin/phpunit --filter ValidateSlug` | Run one test class / method |
 | `cd tests/e2e && npm install && npm test` | Playwright E2E (needs Docker env up, port 8081; system Chrome via `channel: 'chrome'`) |
+| `tests/e2e/ci-bootstrap.sh` | Fresh stack: install YOURLS + activate RBAC (idempotent; CI runs it before E2E) |
 | `composer install` | Install dev deps (PHPUnit) |
 | `php -l <file>` | Lint (only lint tool — no CI, run before commit) |
 | `docker compose up --build` | Dev env: YOURLS + MariaDB at http://localhost:8080, login `admin` / `password123` (falls back to 8081 if 8080 taken — set `RBAC_E2E_BASE_URL` to override) |

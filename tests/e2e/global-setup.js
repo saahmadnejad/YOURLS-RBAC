@@ -17,13 +17,21 @@ const SQL = [
 ].join('; ');
 
 module.exports = async () => {
+  // COMPOSE_PROJECT_NAME lets a local scratch stack coexist with the main
+  // one; CI uses the default project. Tables may not exist on a brand-new
+  // stack until ci-bootstrap.sh activates the plugin — a "table doesn't
+  // exist" failure here means the bootstrap step was skipped or failed.
   try {
     execFileSync('docker', [
       'compose', 'exec', '-T', 'db',
       'mariadb', '-uyourls', '-pyourls', 'yourls',
       '-e', SQL,
-    ], { stdio: 'pipe', cwd: require('path').resolve(__dirname, '../..') });
+    ], {
+      stdio: 'pipe',
+      cwd: require('path').resolve(__dirname, '../..'),
+      env: { ...process.env },
+    });
   } catch (e) {
-    throw new Error(`DB reset failed — is the Docker dev env up? (${e.message})`);
+    throw new Error(`DB reset failed — is the Docker dev env up (and the RBAC plugin activated)? (${e.message})`);
   }
 };

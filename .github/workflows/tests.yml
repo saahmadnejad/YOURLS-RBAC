@@ -75,6 +75,13 @@ jobs:
           docker compose logs
           exit 1
 
+      # Fresh stacks have no YOURLS install and no activated RBAC plugin —
+      # the E2E global-setup DB reset would fail with "table doesn't exist".
+      - name: Install YOURLS and activate RBAC
+        run: tests/e2e/ci-bootstrap.sh
+        env:
+          BASE_URL: http://127.0.0.1:8080
+
       - name: Install E2E dependencies
         working-directory: tests/e2e
         run: npm install
