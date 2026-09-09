@@ -2,6 +2,7 @@
     "name": "rbac/yourls-rbac",
     "description": "RBAC plugin for YOURLS",
     "type": "library",
+    "license": "MIT",
     "authors": [
         {
             "name": "ali",
