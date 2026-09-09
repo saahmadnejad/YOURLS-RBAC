@@ -1,4 +1,11 @@
 [![Listed in Awesome YOURLS!](https://img.shields.io/static/v1?label=Awesome&message=YOURLS&color=C5A3BE&style=plastic)](https://github.com/YOURLS/awesome-yourls/)
+[![Tests](https://github.com/saahmadnejad/YOURLS-RBAC/actions/workflows/tests.yml/badge.svg)](https://github.com/saahmadnejad/YOURLS-RBAC/actions/workflows/tests.yml)
+[![PHP](https://img.shields.io/badge/PHP-%3E%3D8.3-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![PHPUnit](https://img.shields.io/badge/unit%20tests-PHPUnit-3C9CD7?logo=php&logoColor=white)](https://phpunit.de/)
+[![YOURLS](https://img.shields.io/badge/YOURLS-plugin-8F2D56)](https://yourls.org/)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Playwright](https://img.shields.io/badge/E2E%20tests-Playwright-45ba4b?logo=playwright&logoColor=white)](https://playwright.dev/)
+
 # YOURLS-RBAC
 
 Role-Based Access Control (RBAC) user management for [YOURLS](https://yourls.org/) URL shortener.
