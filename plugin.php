@@ -219,13 +219,26 @@ function yourls_rbac_html_head() {
         return;
     }
     if (strpos($context, 'plugin_page_rbac_') === 0) {
-        // RBAC UI layer: plugin-local, cache-busted by file mtime.
-        // yourls_site_url() echoes by default — pass false to get a string.
-        $site = yourls_site_url(false);
-        $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.css');
-        echo '<link rel="stylesheet" href="' . yourls_esc_url($site . '/user/plugins/rbac/admin/rbac-ui.css?v=' . $v) . '" type="text/css" media="screen" />';
-        $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.js');
-        echo '<script src="' . yourls_esc_url($site . '/user/plugins/rbac/admin/rbac-ui.js?v=' . $v) . '"></script>';
+        // Plugin-local UI layer, cache-busted by file mtime.
+        // yourls_plugin_url() returns the FILE URL (.../rbac/plugin.php) —
+        // dirname() gives the plugin directory, so assets resolve no matter
+        // what the plugin folder is named.
+        $base = function_exists('yourls_plugin_url') ? dirname(yourls_plugin_url(__FILE__)) : '';
+        if ($base !== '') {
+            $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.css');
+            echo '<link rel="stylesheet" href="' . yourls_esc_url($base . '/admin/rbac-ui.css?v=' . $v) . '" type="text/css" media="screen" />';
+            $v = (string) @filemtime(__DIR__ . '/admin/rbac-ui.js');
+            echo '<script src="' . yourls_esc_url($base . '/admin/rbac-ui.js?v=' . $v) . '"></script>';
+        }
+        // JS-facing translations (YOURLS has no JS i18n infra) — one JSON blob
+        echo '<script>window.rbacUi = ' . json_encode([
+            'meterLabels' => [
+                yourls__('too weak'), yourls__('weak'), yourls__('fair'),
+                yourls__('good'), yourls__('strong'),
+            ],
+            'themeLight'  => yourls__('Switch to light theme'),
+            'themeDark'   => yourls__('Switch to dark theme'),
+        ]) . ';</script>';
     }
 }
 yourls_add_action('html_head', 'yourls_rbac_html_head');

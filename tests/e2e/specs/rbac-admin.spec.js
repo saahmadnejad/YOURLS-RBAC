@@ -111,15 +111,48 @@ test('theme toggle switches dark mode', async () => {
 test('matrix scrolls inside its wrapper instead of stretching the wrap', async () => {
   await gotoRbacPage(page, 'roles');
   const wrap = page.locator('.rbac-matrix-wrap');
-  // if the table overflows, the WRAPPER must be the scroll container —
-  // the YOURLS #wrap (950px) must not grow
   const cardWidth = await wrap.evaluate((el) => el.closest('.rbac-card').clientWidth);
   const wrapWidth = await wrap.evaluate((el) => el.clientWidth);
   expect(wrapWidth).toBeLessThanOrEqual(cardWidth);
-  const pageScrolls = await wrap.evaluate((el) => el.scrollWidth > el.clientWidth);
-  const tableWider = await wrap.evaluate((el) => el.querySelector('table').offsetWidth);
-  // either it fits, or it scrolls inside
-  expect(wrapWidth + (pageScrolls ? 0 : 0)).toBeLessThanOrEqual(Math.max(cardWidth, tableWider));
+  const { tableWider, wrapperScrolls } = await wrap.evaluate((el) => ({
+    tableWider: el.querySelector('table').offsetWidth > el.clientWidth,
+    wrapperScrolls: el.scrollWidth > el.clientWidth,
+  }));
+  // if the table doesn't fit, the wrapper must be the scroll container
+  expect(wrapperScrolls).toBe(tableWider);
+});
+
+test('delete dialog: Esc cancels without leaking into the next delete', async () => {
+  // Regression: the dialog's yes/no handlers were only unbound on click —
+  // after an Esc cancel, confirming a DIFFERENT row's delete would fire the
+  // stale handler too, deleting both rows.
+  await gotoRbacPage(page, 'users');
+  const names = [`esc_a_${Date.now()}`, `esc_b_${Date.now()}`];
+  for (const n of names) {
+    await page.fill('input[name="rbac_username"]', n);
+    await page.fill('input[name="rbac_password"]', 'escPass1!');
+    await page.click('input[name="save_user"]');
+    await page.waitForLoadState('networkidle');
+    await gotoRbacPage(page, 'users');
+  }
+
+  // open A's delete dialog, dismiss with Esc
+  await itemRow(page, names[0]).locator('input[value="Delete"]').click();
+  const dlg = page.locator('#rbac-confirm-dialog');
+  await expect(dlg).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dlg).not.toBeVisible();
+  await gotoRbacPage(page, 'users');
+  await expect(itemRow(page, names[0])).toBeVisible(); // A still there
+
+  // now confirm B's delete — A must NOT be touched
+  await itemRow(page, names[1]).locator('input[value="Delete"]').click();
+  await expect(dlg).toBeVisible();
+  await dlg.locator('.rbac-confirm-yes').click();
+  await page.waitForLoadState('networkidle');
+  await gotoRbacPage(page, 'users');
+  await expect(itemRow(page, names[1])).toHaveCount(0);
+  await expect(itemRow(page, names[0])).toBeVisible();
 });
 
 test('weak password rejected with inline error', async () => {
