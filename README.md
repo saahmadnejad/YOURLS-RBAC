@@ -1,3 +1,4 @@
+[![Listed in Awesome YOURLS!](https://img.shields.io/static/v1?label=Awesome&message=YOURLS&color=C5A3BE&style=plastic)](https://github.com/YOURLS/awesome-yourls/)
 # YOURLS-RBAC
 
 Role-Based Access Control (RBAC) user management for [YOURLS](https://yourls.org/) URL shortener.
