@@ -58,6 +58,11 @@ jobs:
           cache-dependency-path: tests/e2e/package-lock.json
 
       - name: Start YOURLS
+        env:
+          # One origin everywhere: YOURLS_SITE, the bootstrap and the tests
+          # must agree, or admin_url() links hop origins and lose the
+          # session cookie.
+          YOURLS_SITE_URL: http://127.0.0.1:8080
         run: docker compose up -d --build
 
       - name: Wait for YOURLS
